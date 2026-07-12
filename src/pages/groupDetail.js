@@ -39,8 +39,8 @@ export default async function groupDetailPage([groupId]) {
           ${pendingRequests.map(r => `
             <div class="row between" style="margin-bottom:8px;">
               <div class="row">
-                <img class="avatar sm ${neonClass(r.users?.neon_color)}" src="${r.users?.avatar_url || defaultAvatar(r.users?.nickname)}">
-                ${escapeHtml(r.users?.nickname)}
+                <img class="avatar sm ${neonClass(r.author?.neon_color)}" src="${r.author?.avatar_url || defaultAvatar(r.author?.nickname)}">
+                ${escapeHtml(r.author?.nickname)}
               </div>
               <div class="row">
                 <button class="approve-btn" data-req="${r.id}">تأیید</button>
@@ -56,9 +56,9 @@ export default async function groupDetailPage([groupId]) {
         <div class="row" style="flex-wrap:wrap;">
           ${(members || []).map(m => `
             <div class="row" style="margin-left:14px;">
-              <img class="avatar sm ${neonClass(m.users?.neon_color)}" src="${m.users?.avatar_url || defaultAvatar(m.users?.nickname)}">
-              <span>${escapeHtml(m.users?.nickname)}</span>
-              <span class="presence-dot ${m.users?.is_online ? 'online' : ''}"></span>
+              <img class="avatar sm ${neonClass(m.member?.neon_color)}" src="${m.member?.avatar_url || defaultAvatar(m.member?.nickname)}">
+              <span>${escapeHtml(m.member?.nickname)}</span>
+              <span class="presence-dot ${m.member?.is_online ? 'online' : ''}"></span>
               ${m.role === 'group_admin' ? '<span class="badge mod">مدیر</span>' : ''}
             </div>
           `).join('')}

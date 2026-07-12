@@ -80,7 +80,7 @@ function renderLobby(lobby, me, allComments, allReactions) {
       </div>
 
       <div class="stack" style="font-size:13px;">
-        ${lobbyComments.map(c => `<div><b>${escapeHtml(c.users?.nickname)}</b>: ${escapeHtml(c.content)}</div>`).join('')}
+        ${lobbyComments.map(c => `<div><b>${escapeHtml(c.author?.nickname)}</b>: ${escapeHtml(c.content)}</div>`).join('')}
       </div>
       <form class="lobby-comment-form row" style="margin-top:8px;">
         <input placeholder="کامنت بذار..." required />

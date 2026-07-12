@@ -1,5 +1,6 @@
 const routes = new Map()
 let notFoundHandler = () => `<div class="container empty-state">صفحه پیدا نشد.</div>`
+let renderToken = 0
 
 export function route(path, handler) {
   routes.set(path, handler)
@@ -20,15 +21,17 @@ function parseHash() {
 }
 
 async function render() {
+  // هر رندر یه توکن یکتا می‌گیره؛ اگه تا وقتی handler برگرده ناوبری
+  // دیگه‌ای اتفاق افتاده باشه (توکن عوض شده)، این نتیجه دور ریخته می‌شه
+  // تا رندرهای قدیمی‌تر DOM/سابسکریپشن‌های جدیدتر رو خراب نکنن.
+  const myToken = ++renderToken
   const app = document.getElementById('app')
   const { path, parts } = parseHash()
   const handler = routes.get(path) || notFoundHandler
   app.innerHTML = `<div class="spinner"></div>`
   try {
     const result = await handler(parts)
-    // a page can return either a plain HTML string, or { html, mount }
-    // where mount(appEl) runs after the HTML is in the DOM (for event
-    // listeners, realtime subscriptions, etc.)
+    if (myToken !== renderToken) return
     if (typeof result === 'string') {
       app.innerHTML = result
     } else if (result && typeof result === 'object') {
@@ -36,6 +39,7 @@ async function render() {
       if (typeof result.mount === 'function') await result.mount(app)
     }
   } catch (err) {
+    if (myToken !== renderToken) return
     console.error(err)
     app.innerHTML = `<div class="container empty-state">یه چیزی خراب شد: ${err.message || err}</div>`
   }
@@ -43,6 +47,5 @@ async function render() {
 
 export function initRouter() {
   window.addEventListener('hashchange', render)
-  window.addEventListener('DOMContentLoaded', render)
   render()
 }

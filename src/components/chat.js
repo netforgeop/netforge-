@@ -3,11 +3,11 @@ import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from './navbar.js'
 import { escapeHtml, timeAgo, toast } from '../lib/utils.js'
 
-/**
- * targetType: 'group' | 'lobby'
- * targetId: uuid
- * container: DOM element که چت توش mount میشه (باید از قبل innerHTML چت رو داشته باشه، این تابع فقط رفتار رو وصل می‌کنه)
- */
+// یه رفرنس ماژول-سطح به کانال چت فعال؛ قبل از باز کردن کانال جدید
+// (مثلاً وقتی کاربر بین چت‌های مختلف جابه‌جا می‌شه) این رو می‌بندیم تا
+// دو بار subscribe روی یه topic اتفاق نیفته.
+let activeChannel = null
+
 export function chatMarkup() {
   return `
     <div class="glass" style="padding:14px;">
@@ -26,6 +26,13 @@ export async function mountChat(app, { targetType, targetId, me }) {
   const form = app.querySelector('#chat-form')
   const input = app.querySelector('#chat-input')
   const attachmentInput = app.querySelector('#chat-attachment')
+  if (!scrollEl || !form || !input || !attachmentInput) return
+
+  // اگه از یه چت دیگه اومدیم اینجا و کانال قبلی هنوز باز بود، اول ببندش
+  if (activeChannel) {
+    supabase.removeChannel(activeChannel)
+    activeChannel = null
+  }
 
   async function loadMessages() {
     const { data, error } = await supabase
@@ -41,7 +48,7 @@ export async function mountChat(app, { targetType, targetId, me }) {
   }
 
   function renderMessage(m) {
-    const u = m.users || {}
+    const u = m.sender || {}
     if (m.is_deleted) {
       return `<div class="msg deleted"><div class="bubble">پیام حذف شد</div></div>`
     }
@@ -79,14 +86,19 @@ export async function mountChat(app, { targetType, targetId, me }) {
   await loadMessages()
 
   const channel = supabase
-    .channel(`messages:${targetType}:${targetId}`)
+    .channel(`messages:${targetType}:${targetId}:${Date.now()}`)
     .on('postgres_changes', {
       event: '*', schema: 'public', table: 'messages',
       filter: `target_id=eq.${targetId}`
     }, () => loadMessages())
     .subscribe()
 
-  // برای پاک‌سازی هنگام خروج از صفحه (روتر جدید innerHTML رو عوض می‌کنه ولی
-  // channel باید صریحاً unsubscribe بشه تا نشتی حافظه/کانکشن نداشته باشیم)
-  window.addEventListener('hashchange', () => supabase.removeChannel(channel), { once: true })
+  activeChannel = channel
+
+  window.addEventListener('hashchange', () => {
+    if (activeChannel === channel) {
+      supabase.removeChannel(channel)
+      activeChannel = null
+    }
+  }, { once: true })
 }

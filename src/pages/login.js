@@ -16,9 +16,9 @@ export default async function loginPage() {
           یه فضای خصوصی، فقط با دعوت.
         </p>
 
-        <div class="tabs" style="margin-bottom:20px; justify-content:center;">
-          <button data-mode="login" class="active">ورود</button>
-          <button data-mode="signup">ثبت‌نام با کد دعوت</button>
+        <div class="tabs" style="margin-bottom:20px; justify-content:center; flex-wrap:wrap;">
+          <button data-mode="login" class="active" style="white-space:normal;">ورود</button>
+          <button data-mode="signup" style="white-space:normal;">ثبت‌نام با کد دعوت</button>
         </div>
 
         <form id="login-form" class="stack">

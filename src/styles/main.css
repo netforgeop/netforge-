@@ -159,16 +159,26 @@ input:focus, textarea:focus { border-color: var(--neon); outline: none; }
 .topnav {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
   padding: 12px 20px;
   margin-bottom: 20px;
   border-bottom: 1px solid var(--glass-border);
   background: rgba(10,11,15,.65);
   backdrop-filter: blur(14px);
+  flex-wrap: wrap;
 }
-.topnav .brand { font-weight: 800; font-size: 18px; }
-.tabs { display: flex; gap: 6px; }
+.topnav .brand { font-weight: 800; font-size: 18px; flex-shrink: 0; }
+.tabs {
+  display: flex; gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.tabs::-webkit-scrollbar { display: none; }
 .tabs button {
   background: transparent; border: 1px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .tabs button.active {
   background: var(--glass-strong);
@@ -243,7 +253,49 @@ input:focus, textarea:focus { border-color: var(--neon); outline: none; }
 .text-dim { color: var(--text-dim); font-size: 13px; }
 .mt-2 { margin-top: 20px; }
 
-@media (max-width: 560px) {
-  .container { padding: 16px 12px 70px; }
+html, body { overflow-x: hidden; }
+
+@media (max-width: 640px) {
+  .container { padding: 14px 10px 80px; }
+  .card { padding: 14px; }
   .msg .bubble { max-width: 85%; }
+
+  .topnav { padding: 10px 12px; }
+  .topnav .brand { font-size: 16px; }
+
+  /* کارت‌های لیست گروه/لابی: عنوان+توضیح بالا، دکمه پایین و تمام‌عرض */
+  .glass.card.row.between,
+  [data-lobby-id] > .row.between:first-child {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .glass.card.row.between > *,
+  [data-lobby-id] > .row.between:first-child > *:last-child {
+    width: 100%;
+  }
+  .glass.card.row.between button,
+  [data-lobby-id] .row.between button {
+    width: 100%;
+  }
+
+  /* ردیف ریاکشن/امتیازدهی زیر پست: روی موبایل جمع و جور بشه */
+  .card .row.between {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .avatar.lg { --size: 72px; }
+  .chat-scroll { height: 60vh; }
+  .chat-input-row { flex-wrap: wrap; }
+  .chat-input-row input { min-width: 0; }
+  #chat-attachment { max-width: none !important; flex: 1 1 100%; }
+
+  .modal { padding: 20px; }
+
+  table { display: block; overflow-x: auto; white-space: nowrap; }
+}
+
+@media (max-width: 380px) {
+  body { font-size: 14px; }
+  .topnav .brand { display: none; }
 }

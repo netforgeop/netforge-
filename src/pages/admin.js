@@ -41,9 +41,9 @@ export default async function adminPage() {
         <h3>درخواست‌های دعوت در انتظار</h3>
         ${requests?.length ? requests.map(r => `
           <div class="row between" style="margin-bottom:6px;">
-            <span>${escapeHtml(r.users?.nickname)}</span>
+            <span>${escapeHtml(r.requester?.nickname)}</span>
             <div class="row">
-              <button class="approve-invite-req-btn" data-id="${r.id}" data-user="${escapeHtml(r.users?.nickname)}">تأیید و ساخت کد</button>
+              <button class="approve-invite-req-btn" data-id="${r.id}" data-user="${escapeHtml(r.requester?.nickname)}">تأیید و ساخت کد</button>
               <button class="reject-invite-req-btn danger" data-id="${r.id}">رد</button>
             </div>
           </div>
@@ -54,7 +54,7 @@ export default async function adminPage() {
         <h3>گزارش‌های در انتظار بررسی</h3>
         ${reports?.length ? reports.map(r => `
           <div style="margin-bottom:10px;border-bottom:1px solid var(--glass-border);padding-bottom:8px;">
-            <div>گزارش‌دهنده: ${escapeHtml(r.users?.nickname)} · نوع: ${r.target_type} · ${timeAgo(r.created_at)}</div>
+            <div>گزارش‌دهنده: ${escapeHtml(r.reporter?.nickname)} · نوع: ${r.target_type} · ${timeAgo(r.created_at)}</div>
             ${r.reason ? `<div class="text-dim">دلیل: ${escapeHtml(r.reason)}</div>` : ''}
             <button class="dismiss-report-btn" data-id="${r.id}">بررسی شد</button>
           </div>

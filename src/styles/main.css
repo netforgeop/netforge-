@@ -1,0 +1,249 @@
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
+
+/* =====================================================================
+   Design tokens
+   Palette: near-black blue-charcoal base + frosted glass panels.
+   Neon is NEVER a background -- only rings, thin borders, glow-text,
+   and links, so it reads as a personal signature, not a paint job.
+   ===================================================================== */
+:root {
+  --bg: #0a0b0f;
+  --bg-soft: #101219;
+  --glass: rgba(255, 255, 255, 0.045);
+  --glass-strong: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --text: #e7e9ee;
+  --text-dim: #8b90a0;
+  --text-faint: #5b5f6d;
+  --danger: #ff5470;
+  --success: #38d996;
+
+  /* default neon (used before a user picks their own) */
+  --neon: #4da6ff;
+  --neon-soft: rgba(77, 166, 255, 0.35);
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+
+  --font-ui: 'Vazirmatn', system-ui, sans-serif;
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* neon presets, applied as a class on any element carrying a user's color */
+.neon-red    { --neon: #ff4d6d; --neon-soft: rgba(255, 77, 109, 0.35); }
+.neon-green  { --neon: #37f2a0; --neon-soft: rgba(55, 242, 160, 0.35); }
+.neon-blue   { --neon: #4da6ff; --neon-soft: rgba(77, 166, 255, 0.35); }
+.neon-rgb {
+  animation: neon-cycle 6s linear infinite;
+}
+@keyframes neon-cycle {
+  0%   { --neon: #ff4d6d; }
+  33%  { --neon: #37f2a0; }
+  66%  { --neon: #4da6ff; }
+  100% { --neon: #ff4d6d; }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: radial-gradient(ellipse at top, var(--bg-soft), var(--bg) 60%);
+  color: var(--text);
+  font-family: var(--font-ui);
+  min-height: 100%;
+}
+
+body {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+#app { min-height: 100vh; }
+
+a { color: var(--neon); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3 { font-weight: 700; margin: 0 0 .5em; letter-spacing: -0.01em; }
+
+button, input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  transition: border-color .15s ease, transform .1s ease;
+}
+button:hover { border-color: var(--neon); }
+button:active { transform: scale(.97); }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--neon);
+  outline-offset: 2px;
+}
+button.primary {
+  background: var(--neon);
+  color: #05070d;
+  border-color: transparent;
+  font-weight: 700;
+}
+button.danger { border-color: var(--danger); color: var(--danger); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+
+input, textarea {
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  width: 100%;
+}
+input:focus, textarea:focus { border-color: var(--neon); outline: none; }
+
+/* ---------------------------------------------------------------------
+   Glass panel -- the core structural surface of the whole app
+   --------------------------------------------------------------------- */
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: var(--shadow-glass);
+}
+
+.container {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 18px 80px;
+}
+
+/* ---------------------------------------------------------------------
+   Neon avatar ring -- the app's signature element. Every avatar
+   everywhere (feed, chat, member lists, comments) wears this ring in
+   its owner's chosen color, so identity is legible at a glance across
+   every surface without repeating the person's name each time.
+   --------------------------------------------------------------------- */
+.avatar {
+  --size: 42px;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  object-fit: cover;
+  padding: 2px;
+  background: var(--bg);
+  border: 2px solid var(--neon);
+  box-shadow: 0 0 12px var(--neon-soft);
+  flex-shrink: 0;
+}
+.avatar.lg { --size: 88px; }
+.avatar.sm { --size: 28px; }
+
+.presence-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  display: inline-block;
+  background: var(--text-faint);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.presence-dot.online { background: var(--success); box-shadow: 0 0 8px var(--success), 0 0 0 2px var(--bg); }
+
+/* ---------------------------------------------------------------------
+   Top navigation
+   --------------------------------------------------------------------- */
+.topnav {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(10,11,15,.65);
+  backdrop-filter: blur(14px);
+}
+.topnav .brand { font-weight: 800; font-size: 18px; }
+.tabs { display: flex; gap: 6px; }
+.tabs button {
+  background: transparent; border: 1px solid transparent;
+}
+.tabs button.active {
+  background: var(--glass-strong);
+  border-color: var(--glass-border);
+  color: var(--neon);
+}
+
+/* ---------------------------------------------------------------------
+   Card / post / list item
+   --------------------------------------------------------------------- */
+.card { padding: 18px; margin-bottom: 16px; }
+.card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.card-header .meta { display: flex; flex-direction: column; }
+.card-header .name { font-weight: 700; }
+.card-header .time { font-size: 12px; color: var(--text-dim); }
+
+.badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 100px;
+  border: 1px solid var(--glass-border); color: var(--text-dim);
+}
+.badge.admin { color: var(--danger); border-color: var(--danger); }
+.badge.mod { color: var(--neon); border-color: var(--neon); }
+
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--text-dim);
+}
+
+/* ---------------------------------------------------------------------
+   Chat
+   --------------------------------------------------------------------- */
+.chat-scroll {
+  height: 50vh; overflow-y: auto; padding: 10px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.msg { display: flex; gap: 10px; align-items: flex-start; }
+.msg .bubble {
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  max-width: 70%;
+}
+.msg.deleted .bubble { color: var(--text-faint); font-style: italic; }
+.chat-input-row { display: flex; gap: 8px; margin-top: 10px; }
+.chat-input-row input { flex: 1; }
+
+.spinner {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 3px solid var(--glass-border); border-top-color: var(--neon);
+  animation: spin .7s linear infinite; margin: 30px auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--bg-soft); border: 1px solid var(--glass-border);
+  padding: 12px 20px; border-radius: var(--radius-sm); z-index: 100;
+  box-shadow: var(--shadow-glass);
+}
+.toast.error { border-color: var(--danger); color: var(--danger); }
+
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center; z-index: 50;
+  padding: 20px;
+}
+.modal { max-width: 480px; width: 100%; padding: 28px; }
+
+.row { display: flex; gap: 10px; align-items: center; }
+.between { justify-content: space-between; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.text-dim { color: var(--text-dim); font-size: 13px; }
+.mt-2 { margin-top: 20px; }
+
+@media (max-width: 560px) {
+  .container { padding: 16px 12px 70px; }
+  .msg .bubble { max-width: 85%; }
+}

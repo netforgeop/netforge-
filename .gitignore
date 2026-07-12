@@ -1,0 +1,6 @@
+node_modules
+dist
+*.log
+# توجه: .env عمداً اینجا ignore نشده -- چون فقط شامل SUPABASE_URL و
+# publishable key هست که امن برای انتشار عمومی‌ان (مثل anon key قدیمی).
+# هرگز service_role key رو اینجا یا هیچ‌جای دیگه‌ی کلاینت قرار ندید.

@@ -9,10 +9,7 @@ const EMOJIS = ['👍', '❤️', '😂', '😮', '🔥']
 
 export default async function feedPage() {
   return withShell('feed', async (profile) => {
-    const { data: myBlocks } = await supabase.from('user_blocks').select('blocked_id').eq('blocker_id', profile.id)
-    const blockedIds = new Set((myBlocks || []).map(b => b.blocked_id))
-
-    const { data: rawPosts, error } = await supabase
+    const { data: posts, error } = await supabase
       .from('posts')
       .select('*, author:users!posts_author_id_fkey(nickname, avatar_url, neon_color)')
       .order('created_at', { ascending: false })
@@ -20,33 +17,16 @@ export default async function feedPage() {
 
     if (error) throw error
 
-    // پست‌های کاربرهای بلاک‌شده رو نشون نده -- الان فقط لیست بلاک رو نگه می‌داشتیم
-    // ولی واقعاً فیلترش نمی‌کردیم توی فید.
-    const posts = rawPosts.filter(p => !blockedIds.has(p.author_id))
-
     const postIds = posts.map(p => p.id)
-    const [{ data: ratings }, { data: rawComments }, { data: reactions }] = await Promise.all([
+    const [{ data: ratings }, { data: comments }, { data: reactions }] = await Promise.all([
       postIds.length ? supabase.from('post_ratings').select('post_id, user_id, score').in('post_id', postIds) : { data: [] },
       postIds.length ? supabase.from('post_comments').select('*, author:users!post_comments_author_id_fkey(nickname, avatar_url, neon_color)').in('post_id', postIds).order('created_at') : { data: [] },
       postIds.length ? supabase.from('post_reactions').select('post_id, user_id, emoji').in('post_id', postIds) : { data: [] }
     ])
-    const comments = (rawComments || []).filter(c => !blockedIds.has(c.author_id))
 
     const html = `
-      <div class="glass card" id="new-post-card">
-        <h3>پست جدید</h3>
-        <form id="new-post-form" class="stack">
-          <input name="media_url" placeholder="لینک عکس/ویدیو (اختیاری)" />
-          <textarea name="caption" placeholder="چی می‌خوای بگی؟" rows="2"></textarea>
-          <label class="row" style="font-size:13px;">
-            <input type="checkbox" name="ratings_enabled" checked style="width:auto;" />
-            امتیازدهی برای این پست فعال باشه
-          </label>
-          <button class="primary" type="submit">انتشار</button>
-        </form>
-      </div>
-
-      <div id="posts-list">
+      <!-- فید اصلی پست‌ها کاملاً مشابه اینستاگرام موبایل و وب -->
+      <div id="posts-list" class="instagram-feed-container">
         ${posts.length ? posts.map(p => renderPost(p, profile, ratings, comments, reactions)).join('') : `<div class="empty-state">هنوز پستی نیست. اولین نفر باش.</div>`}
       </div>
     `
@@ -67,46 +47,86 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
   postReactions.forEach(r => { reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1 })
   const myReactions = new Set(postReactions.filter(r => r.user_id === me.id).map(r => r.emoji))
 
+  const isMyPost = post.author_id === me.id
+
   return `
-    <div class="glass card" data-post-id="${post.id}">
-      <div class="card-header between" style="justify-content:space-between;">
+    <div class="instagram-post-card" data-post-id="${post.id}">
+      <!-- هدر پست -->
+      <div class="post-header row between">
         <div class="row">
-          <img class="avatar ${neonClass(author.neon_color)}" src="${escapeHtml(author.avatar_url || defaultAvatar(author.nickname))}">
-          <div class="meta">
-            <span class="name">${escapeHtml(author.nickname)}</span>
-            <span class="time">${timeAgo(post.created_at)}</span>
-          </div>
+          <a href="#/profile/${post.author_id}" class="row" style="color:inherit; text-decoration:none; gap:10px;">
+            <img class="avatar sm ${neonClass(author.neon_color)}" src="${author.avatar_url || defaultAvatar(author.nickname)}">
+            <div class="meta">
+              <span class="name">${escapeHtml(author.nickname)}</span>
+            </div>
+          </a>
+          <span style="color:var(--text-dim); margin:0 5px;">•</span>
+          <span class="time" style="font-size:12px; color:var(--text-dim);">${timeAgo(post.created_at)}</span>
         </div>
-        ${post.author_id !== me.id
-          ? reportBlockMarkup(post.author_id, { targetType: 'post', targetId: post.id })
-          : `<button class="delete-post-btn danger" data-post-id="${post.id}" title="حذف پست" style="padding:2px 8px;font-size:12px;">حذف</button>`}
+        <div class="row" style="gap:8px;">
+          ${isMyPost ? `<button class="delete-post-btn-insta" data-id="${post.id}">حذف</button>` : ''}
+          ${post.author_id !== me.id ? reportBlockMarkup(post.author_id, { targetType: 'post', targetId: post.id }) : ''}
+        </div>
       </div>
-      ${post.media_url ? `<div style="margin-bottom:10px;"><img src="${escapeHtml(post.media_url)}" style="width:100%;border-radius:12px;max-height:420px;object-fit:cover;" onerror="this.style.display='none'"></div>` : ''}
-      ${post.caption ? `<p>${escapeHtml(post.caption)}</p>` : ''}
 
-      <div class="row between" style="margin:10px 0;">
-        <div class="row">
-          ${EMOJIS.map(e => `<button class="react-btn ${myReactions.has(e) ? 'active' : ''}" data-emoji="${e}" style="padding:4px 10px;">${e} ${reactionCounts[e] || ''}</button>`).join('')}
+      <!-- تصویر/مدیا پست -->
+      ${post.media_url ? `
+        <div class="post-media-container">
+          <img src="${escapeHtml(post.media_url)}" onerror="this.parentElement.style.display='none'">
         </div>
+      ` : ''}
+
+      <!-- بخش دکمه‌های ری‌اکشن به سبک اینستاگرام -->
+      <div class="post-actions-bar row between">
+        <div class="row" style="gap:14px;">
+          ${EMOJIS.map(e => `
+            <span class="insta-emoji-btn ${myReactions.has(e) ? 'active' : ''}" data-emoji="${e}">
+              ${e} <small>${reactionCounts[e] || ''}</small>
+            </span>
+          `).join('')}
+        </div>
+
+        <!-- امتیازدهی ستاره‌ای زیبا به جای اسلایدر نمره‌ دهی زشت -->
         ${post.ratings_enabled ? `
-          <div class="row" style="font-size:13px;">
-            ${avg ? `<span class="text-dim">میانگین: ${avg}/۱۰ (${postRatings.length} رأی)</span>` : '<span class="text-dim">هنوز امتیازی نیست</span>'}
-            <input type="range" min="0" max="10" class="rate-input" value="${myRating?.score ?? 5}" style="width:100px;">
-            <span class="rate-value">${myRating?.score ?? 5}</span>
-          </div>` : ''}
+          <div class="row insta-stars-container" style="gap:4px;">
+            ${[2, 4, 6, 8, 10].map(val => {
+              const isActive = (myRating?.score || 0) >= val;
+              return `<span class="insta-star ${isActive ? 'active' : ''}" data-val="${val}">★</span>`;
+            }).join('')}
+            <span class="avg-score" style="margin-right:6px; font-size:12px; color:var(--text-dim);">
+              ${avg ? `${avg}/10` : 'امتیاز دهید'}
+            </span>
+          </div>
+        ` : ''}
       </div>
 
-      <div class="comments-list stack" style="font-size:14px;">
-        ${postComments.map(c => `
-          <div class="row" style="align-items:flex-start;">
-            <img class="avatar sm ${neonClass(c.author?.neon_color)}" src="${escapeHtml(c.author?.avatar_url || defaultAvatar(c.author?.nickname))}">
-            <div><b>${escapeHtml(c.author?.nickname)}</b> ${escapeHtml(c.content)}</div>
+      <!-- کپشن پست -->
+      ${post.caption ? `
+        <div class="post-caption-section">
+          <span class="bold-username">${escapeHtml(author.nickname)}</span>
+          <span class="caption-text">${escapeHtml(post.caption)}</span>
+        </div>
+      ` : ''}
+
+      <!-- کامنت‌ها -->
+      <div class="post-comments-section">
+        ${postComments.length > 0 ? `
+          <div class="view-all-comments-btn">View all ${postComments.length} comments</div>
+          <div class="comments-container stack" style="gap:6px;">
+            ${postComments.map(c => `
+              <div class="comment-row">
+                <span class="bold-username">${escapeHtml(c.author?.nickname)}</span>
+                <span>${escapeHtml(c.content)}</span>
+              </div>
+            `).join('')}
           </div>
-        `).join('')}
+        ` : ''}
       </div>
-      <form class="comment-form row" style="margin-top:8px;">
-        <input placeholder="کامنت بذار..." />
-        <button type="submit">ارسال</button>
+
+      <!-- فرم ثبت کامنت اینستایی -->
+      <form class="comment-form-insta row">
+        <input placeholder="Add a comment..." required />
+        <button type="submit">Post</button>
       </form>
     </div>
   `
@@ -114,49 +134,12 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
 
 function mountFeed(app, me) {
   attachReportBlock(app, me)
-  const newPostForm = app.querySelector('#new-post-form')
-  if (newPostForm) {
-    newPostForm.addEventListener('submit', async (e) => {
-      e.preventDefault()
-      const fd = new FormData(newPostForm)
-      const btn = newPostForm.querySelector('button')
-      btn.disabled = true
-      try {
-        const { error } = await supabase.from('posts').insert({
-          author_id: me.id,
-          media_url: fd.get('media_url')?.trim() || null,
-          caption: fd.get('caption')?.trim() || null,
-          ratings_enabled: !!fd.get('ratings_enabled')
-        })
-        if (error) throw error
-        window.location.reload()
-      } catch (err) {
-        toast(err.message, { error: true })
-        btn.disabled = false
-      }
-    })
-  }
-
-  app.querySelectorAll('.delete-post-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      if (!confirm('این پست حذف بشه؟ این کار برگشت‌پذیر نیست.')) return
-      btn.disabled = true
-      try {
-        const { error } = await supabase.from('posts').delete().eq('id', btn.dataset.postId)
-        if (error) throw error
-        toast('پست حذف شد')
-        window.location.reload()
-      } catch (err) {
-        toast(err.message, { error: true })
-        btn.disabled = false
-      }
-    })
-  })
 
   app.querySelectorAll('[data-post-id]').forEach(card => {
     const postId = card.dataset.postId
 
-    card.querySelectorAll('.react-btn').forEach(btn => {
+    // ری‌اکشن‌ها
+    card.querySelectorAll('.insta-emoji-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const emoji = btn.dataset.emoji
         const active = btn.classList.contains('active')
@@ -171,22 +154,23 @@ function mountFeed(app, me) {
       })
     })
 
-    const rateInput = card.querySelector('.rate-input')
-    if (rateInput) {
-      const rateValue = card.querySelector('.rate-value')
-      rateInput.addEventListener('input', () => { rateValue.textContent = rateInput.value })
-      rateInput.addEventListener('change', async () => {
+    // امتیازدهی ستاره‌ای
+    card.querySelectorAll('.insta-star').forEach(star => {
+      star.addEventListener('click', async () => {
+        const val = Number(star.dataset.val)
         try {
           await supabase.from('post_ratings').upsert({
-            post_id: postId, user_id: me.id, score: Number(rateInput.value), updated_at: new Date().toISOString()
+            post_id: postId, user_id: me.id, score: val, updated_at: new Date().toISOString()
           })
-          toast('امتیازت ثبت شد')
+          toast(`امتیاز ${val} ثبت شد`)
+          window.location.reload()
         } catch (err) { toast(err.message, { error: true }) }
       })
-    }
+    })
 
-    const commentForm = card.querySelector('.comment-form')
-    commentForm.addEventListener('submit', async (e) => {
+    // ارسال کامنت
+    const commentForm = card.querySelector('.comment-form-insta')
+    commentForm?.addEventListener('submit', async (e) => {
       e.preventDefault()
       const input = commentForm.querySelector('input')
       const content = input.value.trim()
@@ -195,6 +179,20 @@ function mountFeed(app, me) {
         await supabase.from('post_comments').insert({ post_id: postId, author_id: me.id, content })
         window.location.reload()
       } catch (err) { toast(err.message, { error: true }) }
+    })
+
+    // حذف پست خودمان
+    const deleteBtn = card.querySelector('.delete-post-btn-insta')
+    deleteBtn?.addEventListener('click', async () => {
+      if (!confirm('آیا از حذف این پست مطمئن هستید؟')) return
+      try {
+        const { error } = await supabase.from('posts').delete().eq('id', deleteBtn.dataset.id)
+        if (error) throw error
+        toast('پست حذف شد')
+        window.location.reload()
+      } catch (err) {
+        toast(err.message, { error: true })
+      }
     })
   })
 }

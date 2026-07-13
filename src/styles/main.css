@@ -1,43 +1,114 @@
 @import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
 
 /* =====================================================================
-   Design tokens
+   Design tokens - تم پیش‌فرض تاریک اینستاگرام
    ===================================================================== */
 :root {
-  --bg: #090a0f;
-  --bg-soft: #0f111a;
+  --bg: #030303; 
+  --bg-soft: #121212;
   --glass: rgba(255, 255, 255, 0.03);
-  --glass-strong: rgba(255, 255, 255, 0.07);
+  --glass-strong: rgba(255, 255, 255, 0.08);
   --glass-border: rgba(255, 255, 255, 0.08);
-  --text: #f1f3f7;
-  --text-dim: #9aa0a6;
-  --text-faint: #606770;
-  --danger: #ff4a6b;
-  --success: #2ec4b6;
+  --text: #f5f5f5;
+  --text-dim: #a8a8a8;
+  --text-faint: #737373;
+  --danger: #ed4956;
+  --success: #0095f6;
 
-  /* default neon */
+  /* default neon (used before a specific user color is set) */
   --neon: #3b82f6;
   --neon-soft: rgba(59, 130, 246, 0.25);
 
   --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 
-  --font-ui: 'Vazirmatn', system-ui, sans-serif;
-  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --font-ui: 'Vazirmatn', system-ui, -apple-system, sans-serif;
+  --shadow-glass: 0 4px 24px rgba(0, 0, 0, 0.6);
 }
 
-/* neon presets */
-.neon-red    { --neon: #ff3e6c; --neon-soft: rgba(255, 62, 108, 0.25); }
-.neon-green  { --neon: #10b981; --neon-soft: rgba(16, 185, 129, 0.25); }
-.neon-blue   { --neon: #3b82f6; --neon-soft: rgba(59, 130, 246, 0.25); }
-.neon-rgb    { animation: neon-cycle 6s linear infinite; }
+/* =====================================================================
+   پالت‌های رنگی درخواستی کاربر برای اکانت‌های مختلف با پالت‌های ۴ رنگی
+   ===================================================================== */
+
+/* ۱. تم آبی (Blue Theme): 293681 -> 4274D9 -> 95CCDD -> D0E7E6 */
+.theme-blue, .neon-blue {
+  --bg: #293681;      /* تیره عمیق سرمه‌ای */
+  --bg-soft: #4274D9; /* آبی ملایم‌تر */
+  --neon: #95CCDD;    /* آبی آسمانی روشن */
+  --text: #D0E7E6;    /* سفید یخی مایل به آبی */
+  --text-dim: #95CCDD;
+  --glass: rgba(41, 54, 129, 0.4);
+  --glass-strong: rgba(66, 116, 217, 0.5);
+  --glass-border: rgba(149, 204, 221, 0.3);
+  --neon-soft: rgba(149, 204, 221, 0.4);
+}
+
+/* ۲. تم سبز (Green Theme): 091413 -> 285A48 -> 408A71 -> B0E4CC */
+.theme-green, .neon-green {
+  --bg: #091413;      /* سبز جنگلی بسیار تیره */
+  --bg-soft: #285A48; /* سبز تیره زیتونی */
+  --neon: #408A71;    /* سبز فیروزه‌ای خوش‌رنگ */
+  --text: #B0E4CC;    /* سبز نعنایی بسیار روشن */
+  --text-dim: #408A71;
+  --glass: rgba(9, 20, 19, 0.4);
+  --glass-strong: rgba(40, 90, 72, 0.5);
+  --glass-border: rgba(64, 138, 113, 0.3);
+  --neon-soft: rgba(64, 138, 113, 0.4);
+}
+
+/* ۳. تم قرمز (Red Theme): 1D1616 -> 8E1616 -> D84040 -> EEEEEE */
+.theme-red, .neon-red {
+  --bg: #1D1616;      /* قرمز مشکی تیره لوکس */
+  --bg-soft: #8E1616; /* قرمز یاقوتی تیره */
+  --neon: #D84040;    /* قرمز آتشی جذاب */
+  --text: #EEEEEE;    /* سفید بسیار تمیز */
+  --text-dim: #D84040;
+  --glass: rgba(29, 22, 22, 0.4);
+  --glass-strong: rgba(142, 22, 22, 0.5);
+  --glass-border: rgba(216, 64, 64, 0.3);
+  --neon-soft: rgba(216, 64, 64, 0.4);
+}
+
+/* ۴. تم افکت متحرک رنگین‌کمانی (RGB Cycle) */
+.theme-rgb, .neon-rgb-cycle {
+  animation: neon-cycle 8s linear infinite;
+  --glass: rgba(20, 20, 25, 0.4);
+}
 
 @keyframes neon-cycle {
-  0%   { --neon: #ff3e6c; }
-  33%  { --neon: #10b981; }
-  66%  { --neon: #3b82f6; }
-  100% { --neon: #ff3e6c; }
+  0%   { 
+    --bg: #1c0a21; /* بنفش تیره */
+    --bg-soft: #4a154b; 
+    --neon: #e01e5a; 
+    --text: #fec2d6;
+    --neon-soft: rgba(224, 30, 90, 0.3);
+    --glass-border: rgba(224, 30, 90, 0.2);
+  }
+  33%  { 
+    --bg: #021a1e; /* آبی فیروزه‌ای تیره */
+    --bg-soft: #005a70; 
+    --neon: #2ec4b6; 
+    --text: #cbf3f0;
+    --neon-soft: rgba(46, 196, 182, 0.3);
+    --glass-border: rgba(46, 196, 182, 0.2);
+  }
+  66%  { 
+    --bg: #1e130c; /* نارنجی زرد تیره */
+    --bg-soft: #5e3023; 
+    --neon: #f77f00; 
+    --text: #eae2b7;
+    --neon-soft: rgba(247, 127, 0, 0.3);
+    --glass-border: rgba(247, 127, 0, 0.2);
+  }
+  100% { 
+    --bg: #1c0a21; 
+    --bg-soft: #4a154b; 
+    --neon: #e01e5a; 
+    --text: #fec2d6;
+    --neon-soft: rgba(224, 30, 90, 0.3);
+    --glass-border: rgba(224, 30, 90, 0.2);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -45,22 +116,22 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
   min-height: 100vh;
+  transition: background-color 0.5s ease, color 0.5s ease;
 }
 
 body {
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.5;
   direction: rtl;
 }
 
 #app {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
 }
 
 a { color: var(--neon); text-decoration: none; }
@@ -95,11 +166,11 @@ button.primary:hover {
   background: color-mix(in srgb, var(--neon) 85%, white);
 }
 button.danger { border-color: var(--danger); color: var(--danger); }
-button.danger:hover { background: rgba(255, 74, 107, 0.1); }
+button.danger:hover { background: rgba(237, 73, 86, 0.1); }
 button:disabled { opacity: .45; cursor: not-allowed; }
 
 input, textarea, select {
-  background: rgba(255,255,255,.03);
+  background: var(--bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
@@ -115,16 +186,39 @@ input:focus, textarea:focus, select:focus { border-color: var(--neon); outline: 
   background: var(--bg-soft);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
   box-shadow: var(--shadow-glass);
 }
 
 .container {
-  max-width: 935px; /* بهینه‌شده برای گرید اینستاگرام */
+  max-width: 600px;
   margin: 0 auto;
-  padding: 20px 15px 80px;
+  padding: 20px 15px 100px;
   width: 100%;
+}
+
+/* =====================================================================
+   افکت رینگ نئونی دور آواتارها با قابلیت چشمک‌زدن و درخشندگی نئونی واقعی
+   ===================================================================== */
+.avatar-wrapper {
+  display: inline-block;
+  border-radius: 50%;
+  padding: 4px; /* فضای بین عکس و رینگ نئون */
+  background: var(--bg);
+  border: 3.5px solid var(--neon);
+  box-shadow: 0 0 16px var(--neon), inset 0 0 10px var(--neon);
+  animation: neon-glow-pulse 2s infinite alternate;
+  line-height: 0;
+}
+
+@keyframes neon-glow-pulse {
+  from {
+    box-shadow: 0 0 12px var(--neon), inset 0 0 6px var(--neon);
+    border-color: var(--neon);
+  }
+  to {
+    box-shadow: 0 0 25px var(--neon), inset 0 0 14px var(--neon);
+    border-color: color-mix(in srgb, var(--neon) 80%, #fff);
+  }
 }
 
 .avatar {
@@ -133,14 +227,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--neon); outline: 
   height: var(--size);
   border-radius: 50%;
   object-fit: cover;
-  padding: 2px;
-  background: var(--bg);
-  border: 2px solid var(--neon);
-  box-shadow: 0 0 10px var(--neon-soft);
   flex-shrink: 0;
 }
-.avatar.lg { --size: 150px; } /* سایز استاندارد اینستاگرام */
-.avatar.sm { --size: 30px; }
+.avatar.lg { --size: 150px; }
+.avatar.sm { --size: 32px; }
 
 .presence-dot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -151,35 +241,363 @@ input:focus, textarea:focus, select:focus { border-color: var(--neon); outline: 
 .presence-dot.online { background: #0095f6; box-shadow: 0 0 8px #0095f6, 0 0 0 2px var(--bg); }
 
 /* ---------------------------------------------------------------------
-   Navigation layouts (Desktop VS Mobile)
+   Discord-style Desktop Left Sidebar
    --------------------------------------------------------------------- */
-.topnav {
-  position: sticky; top: 0; z-index: 20;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 24px;
-  border-bottom: 1px solid var(--glass-border);
-  background: rgba(9, 10, 15, 0.85);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+@media (min-width: 992px) {
+  #app {
+    flex-direction: row-reverse;
+  }
+  .topnav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 240px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    border-right: 1px solid var(--glass-border);
+    border-left: none;
+    padding: 30px 20px;
+    background: #000;
+    z-index: 100;
+  }
+  .topnav .brand {
+    font-weight: 900;
+    font-size: 24px;
+    color: #fff;
+    margin-bottom: 40px;
+    letter-spacing: 1.5px;
+    align-self: center;
+  }
+  .topnav .tabs {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 12px;
+    flex: 1;
+  }
+  .topnav .tabs button {
+    width: 100%;
+    text-align: right;
+    padding: 12px 16px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-dim);
+  }
+  .topnav .tabs button:hover {
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+  }
+  .topnav .tabs button.active {
+    background: rgba(255,255,255,0.1);
+    color: var(--neon);
+    font-weight: bold;
+  }
+  .topnav .tabs button .nav-icon {
+    font-size: 18px;
+  }
+  .topnav .tabs button .nav-label {
+    display: inline;
+  }
+  .user-control-row {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 15px;
+    border-top: 1px solid var(--glass-border);
+    padding-top: 20px;
+  }
+  .user-control-row .nav-label {
+    display: inline;
+  }
+  
+  .container {
+    margin-left: 240px;
+    margin-right: auto;
+    padding-top: 40px;
+  }
 }
-.topnav .brand { font-weight: 800; font-size: 20px; color: var(--neon); }
-.tabs { display: flex; gap: 8px; }
-.tabs button {
-  background: transparent; border: 1px solid transparent; padding: 6px 14px;
+
+/* ---------------------------------------------------------------------
+   Instagram-style Mobile Bottom Nav (Icons only)
+   --------------------------------------------------------------------- */
+@media (max-width: 991px) {
+  #app {
+    flex-direction: column;
+  }
+  .topnav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: #000;
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 100;
+    padding: 0;
+  }
+  .topnav .brand {
+    display: none;
+  }
+  .topnav .tabs {
+    display: flex;
+    width: 100%;
+    justify-content: space-around;
+    height: 100%;
+  }
+  .topnav .tabs button {
+    background: transparent;
+    border: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 25%;
+    height: 100%;
+    border-radius: 0;
+  }
+  .topnav .tabs button .nav-icon {
+    font-size: 22px;
+  }
+  .topnav .tabs button .nav-label {
+    display: none;
+  }
+  .user-control-row {
+    display: flex;
+    position: absolute;
+    top: -48px;
+    right: 15px;
+    left: 15px;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+  .user-control-row * {
+    pointer-events: auto;
+  }
+  .user-control-row .nav-label {
+    display: none;
+  }
+  .user-control-row #logout-btn {
+    display: none;
+  }
+  .container {
+    padding-bottom: 80px;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Instagram Feed and Post Cards Styling
+   --------------------------------------------------------------------- */
+.instagram-feed-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.instagram-post-card {
+  background: var(--bg-soft);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  width: 100%;
+  margin-bottom: 12px;
+}
+.post-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.post-header .meta .name {
+  font-weight: 700;
+  font-size: 14px;
+}
+.post-media-container {
+  width: 100%;
+  aspect-ratio: 1;
+  background: #000;
+  overflow: hidden;
+}
+.post-media-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.post-actions-bar {
+  padding: 12px 16px;
+}
+.insta-emoji-btn {
+  cursor: pointer;
+  font-size: 20px;
+  transition: transform 0.1s ease;
+  user-select: none;
+}
+.insta-emoji-btn:active {
+  transform: scale(1.3);
+}
+.insta-emoji-btn.active {
+  filter: drop-shadow(0 0 4px var(--neon));
+}
+
+.insta-star {
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--text-faint);
+  transition: color 0.15s ease, transform 0.1s ease;
+  user-select: none;
+}
+.insta-star:hover {
+  transform: scale(1.15);
+}
+.insta-star.active {
+  color: #ffb703;
+  text-shadow: 0 0 8px rgba(255, 183, 3, 0.4);
+}
+
+.post-caption-section {
+  padding: 0 16px 8px;
+  font-size: 14px;
+}
+.bold-username {
+  font-weight: 700;
+  margin-left: 6px;
+}
+.post-comments-section {
+  padding: 0 16px 12px;
+  font-size: 13px;
+}
+.view-all-comments-btn {
+  color: var(--text-dim);
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+.comment-form-insta {
+  border-top: 1px solid rgba(255,255,255,0.03);
+  padding: 8px 16px;
+}
+.comment-form-insta input {
+  background: transparent;
+  border: none;
+  padding: 0;
+  flex: 1;
+}
+.comment-form-insta input:focus {
+  border: none;
+  outline: none;
+}
+.comment-form-insta button {
+  background: transparent;
+  border: none;
+  color: #0095f6;
+  font-weight: 700;
+  padding: 0;
+}
+.comment-form-insta button:hover {
+  color: #fff;
+}
+.delete-post-btn-insta {
+  background: transparent;
+  border: none;
+  color: var(--danger);
+  font-size: 12px;
+  padding: 0;
+}
+
+/* ---------------------------------------------------------------------
+   Instagram Create Post Modal Styling
+   --------------------------------------------------------------------- */
+.instagram-new-post-modal {
+  background: var(--bg-soft) !important;
+  border-radius: var(--radius-lg);
+  max-width: 500px !important;
+  overflow: hidden;
+}
+.new-post-modal-header {
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 12px;
+}
+.close-modal-btn {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: var(--text-dim);
+}
+.share-post-btn-insta {
+  background: transparent;
+  border: none;
+  color: #0095f6;
+  font-weight: 700;
+  font-size: 15px;
 }
 .share-post-btn-insta:hover {
   color: #fff;
 }
 
-.card { padding: 18px; margin-bottom: 16px; }
-.card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.card-header .meta { display: flex; flex-direction: column; }
-.card-header .name { font-weight: 700; }
-.card-header .time { font-size: 11px; color: var(--text-dim); }
-
-.badge {
-  font-size: 10px; padding: 2px 6px; border-radius: 100px;
-  border: 1px solid var(--glass-border); color: var(--text-dim);
+/* ---------------------------------------------------------------------
+   Instagram-style Profile Page CSS
+   --------------------------------------------------------------------- */
+.instagram-profile {
+  margin-top: 20px;
+}
+.profile-header {
+  display: flex;
+  gap: 40px;
+  align-items: center;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 40px;
+  margin-bottom: 30px;
+}
+.profile-avatar-container {
+  flex: 0 0 150px;
+  display: flex;
+  justify-content: center;
+}
+.profile-details {
+  flex: 1;
+}
+.profile-username-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.profile-username-row h2 {
+  font-size: 28px;
+  font-weight: 300;
+  margin: 0;
+}
+.profile-stats {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 20px;
+  font-size: 16px;
+}
+.profile-bio-section {
+  font-size: 15px;
+}
+.profile-real-name {
+  font-weight: 700;
+  display: block;
+  margin-bottom: 5px;
+}
+.profile-bio-text {
+  margin: 0 0 10px 0;
+  color: var(--text);
+}
+.profile-status-bubble {
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: 100px;
+  display: inline-block;
+  padding: 4px 12px;
+  font-size: 12px;
 }
 
 .edit-profile-btn, .follow-btn, .invite-lobby-btn {
@@ -255,245 +673,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--neon); outline: 
 }
 
 /* ---------------------------------------------------------------------
-   Instagram & Discord Desktop Integration
-   --------------------------------------------------------------------- */
-@media (min-width: 992px) {
-  #app {
-    flex-direction: row; /* سایدبار دیسکوردی چت در دسکتاپ سمت چپ */
-  }
-  .topnav {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 240px; /* سایدبار عمودی سمت راست */
-    height: 100vh;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    border-bottom: none;
-    border-left: 1px solid var(--glass-border);
-    padding: 30px 20px;
-    gap: 30px;
-  }
-  .topnav .row {
-    flex-direction: column;
-    align-items: flex-start;
-    width: 100%;
-    gap: 20px;
-  }
-  .topnav .tabs {
-    flex-direction: column;
-    width: 100%;
-    gap: 10px;
-  }
-  .topnav .tabs button {
-    width: 100%;
-    text-align: right;
-    padding: 10px 14px;
-    border-radius: var(--radius-sm);
-  }
-  
-  /* فاصله برای محتوای اصلی به خاطر سایدبار فیکس شده */
-  .container {
-    margin-right: 240px;
-    margin-left: 0;
-    padding-top: 30px;
-  }
-}
-
-/* ---------------------------------------------------------------------
-   Instagram-style Profile Page CSS
-   --------------------------------------------------------------------- */
-.instagram-profile {
-  margin-top: 20px;
-}
-.profile-header {
-  display: flex;
-  gap: 40px;
-  align-items: center;
-  border-bottom: 1px solid var(--glass-border);
-  padding-bottom: 40px;
-  margin-bottom: 30px;
-}
-.profile-avatar-container {
-  flex: 0 0 150px;
-  display: flex;
-  justify-content: center;
-}
-.profile-details {
-  flex: 1;
-}
-.profile-username-row {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-.profile-username-row h2 {
-  font-size: 28px;
-  font-weight: 300;
-  margin: 0;
-}
-.profile-stats {
-  display: flex;
-  gap: 40px;
-  margin-bottom: 20px;
-  font-size: 16px;
-}
-.profile-bio-section {
-  font-size: 15px;
-}
-.profile-real-name {
-  font-weight: 700;
-  display: block;
-  margin-bottom: 5px;
-}
-.profile-bio-text {
-  margin: 0 0 10px 0;
-  color: #e1e3e6;
-}
-.profile-status-bubble {
-  background: var(--glass-strong);
-  border: 1px solid var(--glass-border);
-  border-radius: 100px;
-  display: inline-block;
-  padding: 4px 12px;
-  font-size: 12px;
-}
-
-/* دکمه‌های پروفایل */
-.edit-profile-btn, .follow-btn, .invite-lobby-btn {
-  background: transparent;
-  border: 1px solid var(--glass-border);
-  font-weight: 600;
-  font-size: 14px;
-  padding: 5px 16px;
-  border-radius: 4px;
-}
-.follow-btn.active {
-  background: #3b82f6;
-  border-color: transparent;
-}
-
-/* پست‌های گرید اینستایی */
-.profile-posts-grid-container {
-  border-top: 1px solid var(--glass-border);
-}
-.grid-tabs {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 20px;
-}
-.grid-tabs button {
-  background: transparent;
-  border: none;
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 1px;
-  padding: 15px 0;
-  color: var(--text-dim);
-  border-top: 1px solid transparent;
-  border-radius: 0;
-  margin-top: -1px;
-}
-.grid-tabs button.active {
-  color: #fff;
-  border-top: 1px solid #fff;
-}
-.instagram-posts-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 28px;
-}
-.grid-post-item {
-  position: relative;
-  aspect-ratio: 1;
-  background: var(--glass);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  cursor: pointer;
-  border: 1px solid var(--glass-border);
-}
-.grid-post-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s ease;
-}
-.grid-post-item:hover img {
-  transform: scale(1.05);
-}
-.text-post-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 15px;
-  height: 100%;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 13px;
-  overflow: hidden;
-}
-
-/* ---------------------------------------------------------------------
-   Instagram Mobile Bottom Nav
-   --------------------------------------------------------------------- */
-@media (max-width: 991px) {
-  .topnav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    top: auto; /* انتقال منو به پایین صفحه مثل اینستاگرام موبایل */
-    border-top: 1px solid var(--glass-border);
-    border-bottom: none;
-    background: rgba(9, 10, 15, 0.95);
-    height: 60px;
-    padding: 0 10px;
-  }
-  .topnav .brand {
-    display: none; /* مخفی کردن برند برای جا شدن دکمه‌ها */
-  }
-  .topnav .row {
-    width: 100%;
-    justify-content: space-around;
-  }
-  .topnav .tabs {
-    width: 100%;
-    justify-content: space-around;
-  }
-  .topnav .tabs button {
-    padding: 12px;
-    font-size: 12px;
-  }
-  .container {
-    padding-bottom: 100px; /* فاصله برای تداخل نداشتن با منوی پایینی */
-  }
-  
-  /* ریسپانسیو هدر پروفایل در موبایل */
-  .profile-header {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 20px;
-  }
-  .profile-username-row {
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-  }
-  .profile-stats {
-    justify-content: center;
-    gap: 20px;
-  }
-  .instagram-posts-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px; /* فواصل چسبیده‌تر در موبایل مثل اینستاگرام واقعی */
-  }
-}
-
-/* ---------------------------------------------------------------------
    Chat Layout
    --------------------------------------------------------------------- */
 .chat-scroll {
@@ -540,3 +719,25 @@ input:focus, textarea:focus, select:focus { border-color: var(--neon); outline: 
 .stack { display: flex; flex-direction: column; gap: 12px; }
 .text-dim { color: var(--text-dim); font-size: 13px; }
 .mt-2 { margin-top: 20px; }
+
+@media (max-width: 560px) {
+  .profile-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 15px;
+  }
+  .profile-username-row {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .profile-stats {
+    justify-content: center;
+    gap: 15px;
+  }
+  .instagram-posts-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+  }
+}

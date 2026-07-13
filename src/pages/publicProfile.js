@@ -43,11 +43,16 @@ export default async function publicProfilePage(parts = []) {
       .eq('author_id', profile.id)
       .order('created_at', { ascending: false })
 
+    // هماهنگ‌سازی خودکار رنگ بدنه با رنگ نئون انتخابی کاربر
+    const userThemeClass = profile.neon_color === 'red' ? 'theme-red' : profile.neon_color === 'green' ? 'theme-green' : profile.neon_color === 'blue' ? 'theme-blue' : 'theme-rgb'
+
     const html = `
-      <div class="instagram-profile">
+      <div class="instagram-profile ${userThemeClass}">
         <header class="profile-header">
           <div class="profile-avatar-container">
-            <img class="avatar lg ${neonClass(profile.neon_color)}" src="${profile.avatar_url || defaultAvatar(profile.nickname)}">
+            <div class="avatar-wrapper ${neonClass(profile.neon_color)}">
+              <img class="avatar lg" src="${profile.avatar_url || defaultAvatar(profile.nickname)}">
+            </div>
           </div>
           
           <div class="profile-details">

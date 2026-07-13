@@ -13,7 +13,7 @@ export default async function profilePage() {
 
     const html = `
       <div class="glass card" style="text-align:center;">
-        <img class="avatar lg ${neonClass(profile.neon_color)}" src="${profile.avatar_url || defaultAvatar(profile.nickname)}">
+        <img class="avatar lg ${neonClass(profile.neon_color)}" src="${escapeHtml(profile.avatar_url || defaultAvatar(profile.nickname))}">
         <h2>${escapeHtml(profile.nickname)}</h2>
         ${profile.status_text ? `<p class="text-dim">${escapeHtml(profile.status_text)}</p>` : ''}
       </div>
@@ -60,7 +60,7 @@ export default async function profilePage() {
         ${blocks?.length ? blocks.map(b => `
           <div class="row between" style="margin-bottom:8px;">
             <div class="row">
-              <img class="avatar sm" src="${b.users?.avatar_url || defaultAvatar(b.users?.nickname)}">
+              <img class="avatar sm" src="${escapeHtml(b.users?.avatar_url || defaultAvatar(b.users?.nickname))}">
               ${escapeHtml(b.users?.nickname)}
             </div>
             <button class="unblock-btn" data-user-id="${b.blocked_id}">آنبلاک</button>
@@ -75,29 +75,31 @@ export default async function profilePage() {
 
 function mountProfile(app, me) {
   const form = app.querySelector('#edit-profile-form')
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const fd = new FormData(form)
-    const btn = form.querySelector('button')
-    btn.disabled = true
-    try {
-      const { error } = await supabase.from('users').update({
-        avatar_url: fd.get('avatar_url')?.trim() || null,
-        bio: fd.get('bio')?.trim() || null,
-        profile_music_url: fd.get('profile_music_url')?.trim() || null,
-        status_text: fd.get('status_text')?.trim() || null,
-        status_gif_url: fd.get('status_gif_url')?.trim() || null,
-        neon_color: fd.get('neon_color')
-      }).eq('id', me.id)
-      if (error) throw error
-      clearProfileCache()
-      toast('پروفایل به‌روزرسانی شد')
-      window.location.reload()
-    } catch (err) {
-      toast(err.message, { error: true })
-      btn.disabled = false
-    }
-  })
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const fd = new FormData(form)
+      const btn = form.querySelector('button')
+      btn.disabled = true
+      try {
+        const { error } = await supabase.from('users').update({
+          avatar_url: fd.get('avatar_url')?.trim() || null,
+          bio: fd.get('bio')?.trim() || null,
+          profile_music_url: fd.get('profile_music_url')?.trim() || null,
+          status_text: fd.get('status_text')?.trim() || null,
+          status_gif_url: fd.get('status_gif_url')?.trim() || null,
+          neon_color: fd.get('neon_color')
+        }).eq('id', me.id)
+        if (error) throw error
+        clearProfileCache()
+        toast('پروفایل به‌روزرسانی شد')
+        window.location.reload()
+      } catch (err) {
+        toast(err.message, { error: true })
+        btn.disabled = false
+      }
+    })
+  }
 
   app.querySelectorAll('.unblock-btn').forEach(btn => {
     btn.addEventListener('click', async () => {

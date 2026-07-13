@@ -77,20 +77,23 @@ export default async function adminPage() {
 }
 
 function mountAdmin(app) {
-  app.querySelector('#new-code-form').addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const fd = new FormData(e.target)
-    try {
-      const { data: session } = await supabase.auth.getSession()
-      const { error } = await supabase.from('invite_codes').insert({
-        code: fd.get('code').trim(),
-        max_uses: Number(fd.get('max_uses')) || 1,
-        created_by: session.session.user.id
-      })
-      if (error) throw error
-      window.location.reload()
-    } catch (err) { toast(err.message, { error: true }) }
-  })
+  const newCodeForm = app.querySelector('#new-code-form')
+  if (newCodeForm) {
+    newCodeForm.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const fd = new FormData(e.target)
+      try {
+        const { data: session } = await supabase.auth.getSession()
+        const { error } = await supabase.from('invite_codes').insert({
+          code: fd.get('code').trim(),
+          max_uses: Number(fd.get('max_uses')) || 1,
+          created_by: session.session.user.id
+        })
+        if (error) throw error
+        window.location.reload()
+      } catch (err) { toast(err.message, { error: true }) }
+    })
+  }
 
   app.querySelectorAll('.deactivate-code-btn').forEach(btn => {
     btn.addEventListener('click', async () => {

@@ -26,7 +26,7 @@ export function renderTopnav(profile, activeTab) {
       <div class="row">
         ${roleBadge}
         <a href="#/profile" title="${escapeHtml(profile.nickname)}">
-          <img class="avatar sm ${neonClass(profile.neon_color)}" src="${profile.avatar_url || defaultAvatar(profile.nickname)}" alt="">
+          <img class="avatar sm ${neonClass(profile.neon_color)}" src="${escapeHtml(profile.avatar_url || defaultAvatar(profile.nickname))}" alt="">
         </a>
         <button id="logout-btn">خروج</button>
       </div>

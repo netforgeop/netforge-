@@ -83,7 +83,7 @@ function renderLobby(lobby, me, allComments, allReactions) {
         ${lobbyComments.map(c => `<div><b>${escapeHtml(c.author?.nickname)}</b>: ${escapeHtml(c.content)}</div>`).join('')}
       </div>
       <form class="lobby-comment-form row" style="margin-top:8px;">
-        <input placeholder="کامنت بذار..." required />
+        <input placeholder="کامنت بذار..." />
         <button type="submit">ارسال</button>
       </form>
     </div>
@@ -92,26 +92,28 @@ function renderLobby(lobby, me, allComments, allReactions) {
 
 function mountLobbies(app, me) {
   const form = app.querySelector('#new-lobby-form')
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const fd = new FormData(form)
-    const btn = form.querySelector('button')
-    btn.disabled = true
-    try {
-      const { error } = await supabase.from('game_lobbies').insert({
-        game_name: fd.get('game_name').trim(),
-        category: fd.get('category')?.trim() || null,
-        description: fd.get('description')?.trim() || null,
-        capacity: Number(fd.get('capacity')) || 5,
-        host_id: me.id
-      })
-      if (error) throw error
-      window.location.reload()
-    } catch (err) {
-      toast(err.message, { error: true })
-      btn.disabled = false
-    }
-  })
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const fd = new FormData(form)
+      const btn = form.querySelector('button')
+      btn.disabled = true
+      try {
+        const { error } = await supabase.from('game_lobbies').insert({
+          game_name: fd.get('game_name').trim(),
+          category: fd.get('category')?.trim() || null,
+          description: fd.get('description')?.trim() || null,
+          capacity: Number(fd.get('capacity')) || 5,
+          host_id: me.id
+        })
+        if (error) throw error
+        window.location.reload()
+      } catch (err) {
+        toast(err.message, { error: true })
+        btn.disabled = false
+      }
+    })
+  }
 
   app.querySelectorAll('.join-lobby-btn').forEach(btn => {
     btn.addEventListener('click', async () => {

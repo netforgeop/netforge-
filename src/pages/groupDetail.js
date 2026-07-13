@@ -39,7 +39,7 @@ export default async function groupDetailPage([groupId]) {
           ${pendingRequests.map(r => `
             <div class="row between" style="margin-bottom:8px;">
               <div class="row">
-                <img class="avatar sm ${neonClass(r.author?.neon_color)}" src="${r.author?.avatar_url || defaultAvatar(r.author?.nickname)}">
+                <img class="avatar sm ${neonClass(r.author?.neon_color)}" src="${escapeHtml(r.author?.avatar_url || defaultAvatar(r.author?.nickname))}">
                 ${escapeHtml(r.author?.nickname)}
               </div>
               <div class="row">
@@ -56,7 +56,7 @@ export default async function groupDetailPage([groupId]) {
         <div class="row" style="flex-wrap:wrap;">
           ${(members || []).map(m => `
             <div class="row" style="margin-left:14px;">
-              <img class="avatar sm ${neonClass(m.member?.neon_color)}" src="${m.member?.avatar_url || defaultAvatar(m.member?.nickname)}">
+              <img class="avatar sm ${neonClass(m.member?.neon_color)}" src="${escapeHtml(m.member?.avatar_url || defaultAvatar(m.member?.nickname))}">
               <span>${escapeHtml(m.member?.nickname)}</span>
               <span class="presence-dot ${m.member?.is_online ? 'online' : ''}"></span>
               ${m.role === 'group_admin' ? '<span class="badge mod">مدیر</span>' : ''}

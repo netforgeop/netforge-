@@ -36,7 +36,16 @@ async function render() {
       app.innerHTML = result
     } else if (result && typeof result === 'object') {
       app.innerHTML = result.html
-      if (typeof result.mount === 'function') await result.mount(app)
+      if (typeof result.mount === 'function') {
+        // اگه چیزی توی مرحله‌ی mount (وصل کردن event listener ها) خطا بده،
+        // نباید کل صفحه‌ای که با موفقیت رندر شده رو با صفحه‌ی خطا پاک کنیم.
+        // فقط لاگ می‌کنیم؛ محتوا سر جاش می‌مونه، فقط شاید یه دکمه کار نکنه.
+        try {
+          await result.mount(app)
+        } catch (mountErr) {
+          console.error('mount error (content stays visible):', mountErr)
+        }
+      }
     }
   } catch (err) {
     if (myToken !== renderToken) return

@@ -61,24 +61,26 @@ function renderGroup(g, memberIds, pendingIds) {
 
 function mountGroups(app, me) {
   const form = app.querySelector('#new-group-form')
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const fd = new FormData(form)
-    const btn = form.querySelector('button')
-    btn.disabled = true
-    try {
-      const { error } = await supabase.from('groups').insert({
-        name: fd.get('name').trim(),
-        description: fd.get('description')?.trim() || null,
-        created_by: me.id
-      })
-      if (error) throw error
-      window.location.reload()
-    } catch (err) {
-      toast(err.message, { error: true })
-      btn.disabled = false
-    }
-  })
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const fd = new FormData(form)
+      const btn = form.querySelector('button')
+      btn.disabled = true
+      try {
+        const { error } = await supabase.from('groups').insert({
+          name: fd.get('name').trim(),
+          description: fd.get('description')?.trim() || null,
+          created_by: me.id
+        })
+        if (error) throw error
+        window.location.reload()
+      } catch (err) {
+        toast(err.message, { error: true })
+        btn.disabled = false
+      }
+    })
+  }
 
   app.querySelectorAll('.join-group-btn').forEach(btn => {
     btn.addEventListener('click', async () => {

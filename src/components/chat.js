@@ -13,7 +13,7 @@ export function chatMarkup() {
     <div class="glass" style="padding:14px;">
       <div class="chat-scroll" id="chat-scroll"></div>
       <form id="chat-form" class="chat-input-row">
-        <input id="chat-input" placeholder="پیام بنویس..." autocomplete="off" required />
+        <input id="chat-input" placeholder="پیام بنویس..." autocomplete="off" />
         <input id="chat-attachment" placeholder="لینک فایل (اختیاری)" style="max-width:160px;" />
         <button type="submit">ارسال</button>
       </form>
@@ -54,7 +54,7 @@ export async function mountChat(app, { targetType, targetId, me }) {
     }
     return `
       <div class="msg">
-        <img class="avatar sm ${neonClass(u.neon_color)}" src="${u.avatar_url || defaultAvatar(u.nickname)}">
+        <img class="avatar sm ${neonClass(u.neon_color)}" src="${escapeHtml(u.avatar_url || defaultAvatar(u.nickname))}">
         <div>
           <div class="text-dim" style="font-size:12px;">${escapeHtml(u.nickname)} · ${timeAgo(m.created_at)} ${m.is_edited ? '(ویرایش‌شده)' : ''}</div>
           <div class="bubble">

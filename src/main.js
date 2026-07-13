@@ -15,7 +15,7 @@ route('/login', loginPage)
 route('/feed', feedPage)
 route('/groups', (parts) => parts.length ? groupDetailPage(parts) : groupsPage())
 route('/lobbies', (parts) => parts.length ? lobbyDetailPage(parts) : lobbiesPage())
-route('/profile', profilePage)
+route('/profile', (parts) => profilePage(parts)) // ارسال آرگومان‌ها به صورت مستقیم به پروفایل
 route('/admin', adminPage)
 
 setNotFound(() => {
@@ -26,9 +26,7 @@ setNotFound(() => {
 initRouter()
 
 // ---------------------------------------------------------------------
-// Presence: یه رد ساده‌ی online/offline. برای presence لحظه‌ای دقیق‌تر
-// (typing indicator و غیره) می‌شه از Supabase Presence API روی یک
-// کانال مشترک استفاده کرد -- این نسخه‌ی ساده کافیه برای شروع.
+// Presence
 // ---------------------------------------------------------------------
 async function markOnline(isOnline) {
   const { data } = await supabase.auth.getSession()
@@ -44,4 +42,4 @@ supabase.auth.onAuthStateChange((event) => {
 
 window.addEventListener('load', () => markOnline(true))
 window.addEventListener('beforeunload', () => markOnline(false))
-setInterval(() => markOnline(true), 60_000) // heartbeat هر ۱ دقیقه
+setInterval(() => markOnline(true), 60_000)

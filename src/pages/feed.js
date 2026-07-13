@@ -9,10 +9,7 @@ const EMOJIS = ['👍', '❤️', '😂', '😮', '🔥']
 
 export default async function feedPage() {
   return withShell('feed', async (profile) => {
-    const { data: myBlocks } = await supabase.from('user_blocks').select('blocked_id').eq('blocker_id', profile.id)
-    const blockedIds = new Set((myBlocks || []).map(b => b.blocked_id))
-
-    const { data: rawPosts, error } = await supabase
+    const { data: posts, error } = await supabase
       .from('posts')
       .select('*, author:users!posts_author_id_fkey(nickname, avatar_url, neon_color)')
       .order('created_at', { ascending: false })
@@ -20,17 +17,12 @@ export default async function feedPage() {
 
     if (error) throw error
 
-    // پست‌های کاربرهای بلاک‌شده رو نشون نده -- الان فقط لیست بلاک رو نگه می‌داشتیم
-    // ولی واقعاً فیلترش نمی‌کردیم توی فید.
-    const posts = rawPosts.filter(p => !blockedIds.has(p.author_id))
-
     const postIds = posts.map(p => p.id)
-    const [{ data: ratings }, { data: rawComments }, { data: reactions }] = await Promise.all([
+    const [{ data: ratings }, { data: comments }, { data: reactions }] = await Promise.all([
       postIds.length ? supabase.from('post_ratings').select('post_id, user_id, score').in('post_id', postIds) : { data: [] },
       postIds.length ? supabase.from('post_comments').select('*, author:users!post_comments_author_id_fkey(nickname, avatar_url, neon_color)').in('post_id', postIds).order('created_at') : { data: [] },
       postIds.length ? supabase.from('post_reactions').select('post_id, user_id, emoji').in('post_id', postIds) : { data: [] }
     ])
-    const comments = (rawComments || []).filter(c => !blockedIds.has(c.author_id))
 
     const html = `
       <div class="glass card" id="new-post-card">
@@ -38,8 +30,8 @@ export default async function feedPage() {
         <form id="new-post-form" class="stack">
           <input name="media_url" placeholder="لینک عکس/ویدیو (اختیاری)" />
           <textarea name="caption" placeholder="چی می‌خوای بگی؟" rows="2"></textarea>
-          <label class="row" style="font-size:13px;">
-            <input type="checkbox" name="ratings_enabled" checked style="width:auto;" />
+          <label class="row" style="font-size:13px; width:auto; cursor:pointer;">
+            <input type="checkbox" name="ratings_enabled" checked style="width:auto; margin:0 5px;" />
             امتیازدهی برای این پست فعال باشه
           </label>
           <button class="primary" type="submit">انتشار</button>
@@ -67,19 +59,24 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
   postReactions.forEach(r => { reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1 })
   const myReactions = new Set(postReactions.filter(r => r.user_id === me.id).map(r => r.emoji))
 
+  const isMyPost = post.author_id === me.id
+
   return `
-    <div class="glass card" data-post-id="${post.id}">
+    <div class="glass card instagram-post" data-post-id="${post.id}">
       <div class="card-header between" style="justify-content:space-between;">
         <div class="row">
-          <img class="avatar ${neonClass(author.neon_color)}" src="${escapeHtml(author.avatar_url || defaultAvatar(author.nickname))}">
-          <div class="meta">
-            <span class="name">${escapeHtml(author.nickname)}</span>
-            <span class="time">${timeAgo(post.created_at)}</span>
-          </div>
+          <a href="#/profile/${post.author_id}" class="row" style="color:inherit; text-decoration:none;">
+            <img class="avatar ${neonClass(author.neon_color)}" src="${author.avatar_url || defaultAvatar(author.nickname)}">
+            <div class="meta" style="margin-right:8px;">
+              <span class="name">${escapeHtml(author.nickname)}</span>
+              <span class="time">${timeAgo(post.created_at)}</span>
+            </div>
+          </a>
         </div>
-        ${post.author_id !== me.id
-          ? reportBlockMarkup(post.author_id, { targetType: 'post', targetId: post.id })
-          : `<button class="delete-post-btn danger" data-post-id="${post.id}" title="حذف پست" style="padding:2px 8px;font-size:12px;">حذف</button>`}
+        <div class="row" style="gap:8px;">
+          ${isMyPost ? `<button class="delete-post-btn danger" data-id="${post.id}" style="padding:4px 10px; font-size:12px;">حذف</button>` : ''}
+          ${post.author_id !== me.id ? reportBlockMarkup(post.author_id, { targetType: 'post', targetId: post.id }) : ''}
+        </div>
       </div>
       ${post.media_url ? `<div style="margin-bottom:10px;"><img src="${escapeHtml(post.media_url)}" style="width:100%;border-radius:12px;max-height:420px;object-fit:cover;" onerror="this.style.display='none'"></div>` : ''}
       ${post.caption ? `<p>${escapeHtml(post.caption)}</p>` : ''}
@@ -96,16 +93,21 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
           </div>` : ''}
       </div>
 
-      <div class="comments-list stack" style="font-size:14px;">
+      <div class="comments-list stack" style="font-size:14px; margin-bottom: 10px;">
         ${postComments.map(c => `
           <div class="row" style="align-items:flex-start;">
-            <img class="avatar sm ${neonClass(c.author?.neon_color)}" src="${escapeHtml(c.author?.avatar_url || defaultAvatar(c.author?.nickname))}">
-            <div><b>${escapeHtml(c.author?.nickname)}</b> ${escapeHtml(c.content)}</div>
+            <a href="#/profile/${c.author_id}" style="color:inherit; text-decoration:none;">
+              <img class="avatar sm ${neonClass(c.author?.neon_color)}" src="${c.author?.avatar_url || defaultAvatar(c.author?.nickname)}">
+            </a>
+            <div style="margin-right:8px;">
+              <a href="#/profile/${c.author_id}" style="color:inherit; text-decoration:none; font-weight:bold;">${escapeHtml(c.author?.nickname)}</a>
+              <span>${escapeHtml(c.content)}</span>
+            </div>
           </div>
         `).join('')}
       </div>
       <form class="comment-form row" style="margin-top:8px;">
-        <input placeholder="کامنت بذار..." />
+        <input placeholder="کامنت بذار..." required />
         <button type="submit">ارسال</button>
       </form>
     </div>
@@ -115,42 +117,24 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
 function mountFeed(app, me) {
   attachReportBlock(app, me)
   const newPostForm = app.querySelector('#new-post-form')
-  if (newPostForm) {
-    newPostForm.addEventListener('submit', async (e) => {
-      e.preventDefault()
-      const fd = new FormData(newPostForm)
-      const btn = newPostForm.querySelector('button')
-      btn.disabled = true
-      try {
-        const { error } = await supabase.from('posts').insert({
-          author_id: me.id,
-          media_url: fd.get('media_url')?.trim() || null,
-          caption: fd.get('caption')?.trim() || null,
-          ratings_enabled: !!fd.get('ratings_enabled')
-        })
-        if (error) throw error
-        window.location.reload()
-      } catch (err) {
-        toast(err.message, { error: true })
-        btn.disabled = false
-      }
-    })
-  }
-
-  app.querySelectorAll('.delete-post-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      if (!confirm('این پست حذف بشه؟ این کار برگشت‌پذیر نیست.')) return
-      btn.disabled = true
-      try {
-        const { error } = await supabase.from('posts').delete().eq('id', btn.dataset.postId)
-        if (error) throw error
-        toast('پست حذف شد')
-        window.location.reload()
-      } catch (err) {
-        toast(err.message, { error: true })
-        btn.disabled = false
-      }
-    })
+  newPostForm?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const fd = new FormData(newPostForm)
+    const btn = newPostForm.querySelector('button')
+    btn.disabled = true
+    try {
+      const { error } = await supabase.from('posts').insert({
+        author_id: me.id,
+        media_url: fd.get('media_url')?.trim() || null,
+        caption: fd.get('caption')?.trim() || null,
+        ratings_enabled: !!fd.get('ratings_enabled')
+      })
+      if (error) throw error
+      window.location.reload()
+    } catch (err) {
+      toast(err.message, { error: true })
+      btn.disabled = false
+    }
   })
 
   app.querySelectorAll('[data-post-id]').forEach(card => {
@@ -186,7 +170,7 @@ function mountFeed(app, me) {
     }
 
     const commentForm = card.querySelector('.comment-form')
-    commentForm.addEventListener('submit', async (e) => {
+    commentForm?.addEventListener('submit', async (e) => {
       e.preventDefault()
       const input = commentForm.querySelector('input')
       const content = input.value.trim()
@@ -195,6 +179,19 @@ function mountFeed(app, me) {
         await supabase.from('post_comments').insert({ post_id: postId, author_id: me.id, content })
         window.location.reload()
       } catch (err) { toast(err.message, { error: true }) }
+    })
+
+    const deleteBtn = card.querySelector('.delete-post-btn')
+    deleteBtn?.addEventListener('click', async () => {
+      if (!confirm('آیا از حذف این پست مطمئن هستید؟')) return
+      try {
+        const { error } = await supabase.from('posts').delete().eq('id', deleteBtn.dataset.id)
+        if (error) throw error
+        toast('پست با موفقیت حذف شد')
+        window.location.reload()
+      } catch (err) {
+        toast(err.message, { error: true })
+      }
     })
   })
 }

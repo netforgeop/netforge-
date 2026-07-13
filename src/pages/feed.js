@@ -25,8 +25,20 @@ export default async function feedPage() {
     ])
 
     const html = `
-      <!-- فید اصلی پست‌ها کاملاً مشابه اینستاگرام موبایل و وب -->
-      <div id="posts-list" class="instagram-feed-container">
+      <div class="glass card" id="new-post-card">
+        <h3>پست جدید</h3>
+        <form id="new-post-form" class="stack">
+          <input name="media_url" placeholder="لینک عکس/ویدیو (اختیاری)" />
+          <textarea name="caption" placeholder="چی می‌خوای بگی؟" rows="2"></textarea>
+          <label class="row" style="font-size:13px; width:auto; cursor:pointer;">
+            <input type="checkbox" name="ratings_enabled" checked style="width:auto; margin:0 5px;" />
+            امتیازدهی برای این پست فعال باشه
+          </label>
+          <button class="primary" type="submit">انتشار</button>
+        </form>
+      </div>
+
+      <div id="posts-list">
         ${posts.length ? posts.map(p => renderPost(p, profile, ratings, comments, reactions)).join('') : `<div class="empty-state">هنوز پستی نیست. اولین نفر باش.</div>`}
       </div>
     `
@@ -50,21 +62,19 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
   const isMyPost = post.author_id === me.id
 
   return `
-    <div class="instagram-post-card" data-post-id="${post.id}">
-      <!-- هدر پست -->
-      <div class="post-header row between">
+    <div class="glass card instagram-post" data-post-id="${post.id}">
+      <div class="card-header between" style="justify-content:space-between;">
         <div class="row">
-          <a href="#/profile/${post.author_id}" class="row" style="color:inherit; text-decoration:none; gap:10px;">
-            <img class="avatar sm ${neonClass(author.neon_color)}" src="${author.avatar_url || defaultAvatar(author.nickname)}">
-            <div class="meta">
+          <a href="#/profile/${post.author_id}" class="row" style="color:inherit; text-decoration:none;">
+            <img class="avatar ${neonClass(author.neon_color)}" src="${author.avatar_url || defaultAvatar(author.nickname)}">
+            <div class="meta" style="margin-right:8px;">
               <span class="name">${escapeHtml(author.nickname)}</span>
+              <span class="time">${timeAgo(post.created_at)}</span>
             </div>
           </a>
-          <span style="color:var(--text-dim); margin:0 5px;">•</span>
-          <span class="time" style="font-size:12px; color:var(--text-dim);">${timeAgo(post.created_at)}</span>
         </div>
         <div class="row" style="gap:8px;">
-          ${isMyPost ? `<button class="delete-post-btn-insta" data-id="${post.id}">حذف</button>` : ''}
+          ${isMyPost ? `<button class="delete-post-btn danger" data-id="${post.id}" style="padding:4px 10px; font-size:12px;">حذف</button>` : ''}
           ${post.author_id !== me.id ? reportBlockMarkup(post.author_id, { targetType: 'post', targetId: post.id }) : ''}
         </div>
       </div>
@@ -100,33 +110,22 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
         ` : ''}
       </div>
 
-      <!-- کپشن پست -->
-      ${post.caption ? `
-        <div class="post-caption-section">
-          <span class="bold-username">${escapeHtml(author.nickname)}</span>
-          <span class="caption-text">${escapeHtml(post.caption)}</span>
-        </div>
-      ` : ''}
-
-      <!-- کامنت‌ها -->
-      <div class="post-comments-section">
-        ${postComments.length > 0 ? `
-          <div class="view-all-comments-btn">View all ${postComments.length} comments</div>
-          <div class="comments-container stack" style="gap:6px;">
-            ${postComments.map(c => `
-              <div class="comment-row">
-                <span class="bold-username">${escapeHtml(c.author?.nickname)}</span>
-                <span>${escapeHtml(c.content)}</span>
-              </div>
-            `).join('')}
+      <div class="comments-list stack" style="font-size:14px; margin-bottom: 10px;">
+        ${postComments.map(c => `
+          <div class="row" style="align-items:flex-start;">
+            <a href="#/profile/${c.author_id}" style="color:inherit; text-decoration:none;">
+              <img class="avatar sm ${neonClass(c.author?.neon_color)}" src="${c.author?.avatar_url || defaultAvatar(c.author?.nickname)}">
+            </a>
+            <div style="margin-right:8px;">
+              <a href="#/profile/${c.author_id}" style="color:inherit; text-decoration:none; font-weight:bold;">${escapeHtml(c.author?.nickname)}</a>
+              <span>${escapeHtml(c.content)}</span>
+            </div>
           </div>
         ` : ''}
       </div>
-
-      <!-- فرم ثبت کامنت اینستایی -->
-      <form class="comment-form-insta row">
-        <input placeholder="Add a comment..." required />
-        <button type="submit">Post</button>
+      <form class="comment-form row" style="margin-top:8px;">
+        <input placeholder="کامنت بذار..." required />
+        <button type="submit">ارسال</button>
       </form>
     </div>
   `
@@ -134,6 +133,26 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
 
 function mountFeed(app, me) {
   attachReportBlock(app, me)
+  const newPostForm = app.querySelector('#new-post-form')
+  newPostForm?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const fd = new FormData(newPostForm)
+    const btn = newPostForm.querySelector('button')
+    btn.disabled = true
+    try {
+      const { error } = await supabase.from('posts').insert({
+        author_id: me.id,
+        media_url: fd.get('media_url')?.trim() || null,
+        caption: fd.get('caption')?.trim() || null,
+        ratings_enabled: !!fd.get('ratings_enabled')
+      })
+      if (error) throw error
+      window.location.reload()
+    } catch (err) {
+      toast(err.message, { error: true })
+      btn.disabled = false
+    }
+  })
 
   app.querySelectorAll('[data-post-id]').forEach(card => {
     const postId = card.dataset.postId
@@ -168,8 +187,7 @@ function mountFeed(app, me) {
       })
     })
 
-    // ارسال کامنت
-    const commentForm = card.querySelector('.comment-form-insta')
+    const commentForm = card.querySelector('.comment-form')
     commentForm?.addEventListener('submit', async (e) => {
       e.preventDefault()
       const input = commentForm.querySelector('input')
@@ -181,14 +199,13 @@ function mountFeed(app, me) {
       } catch (err) { toast(err.message, { error: true }) }
     })
 
-    // حذف پست خودمان
-    const deleteBtn = card.querySelector('.delete-post-btn-insta')
+    const deleteBtn = card.querySelector('.delete-post-btn')
     deleteBtn?.addEventListener('click', async () => {
       if (!confirm('آیا از حذف این پست مطمئن هستید؟')) return
       try {
         const { error } = await supabase.from('posts').delete().eq('id', deleteBtn.dataset.id)
         if (error) throw error
-        toast('پست حذف شد')
+        toast('پست با موفقیت حذف شد')
         window.location.reload()
       } catch (err) {
         toast(err.message, { error: true })

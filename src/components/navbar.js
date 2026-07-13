@@ -3,12 +3,11 @@ import { escapeHtml } from '../lib/utils.js'
 
 export function renderTopnav(profile, activeTab) {
   const tabs = [
-    { key: 'feed', icon: '🏠', label: 'Home' },
-    { key: 'new-post', icon: '➕', label: 'Create' },
-    { key: 'groups', icon: '👥', label: 'Groups' },
-    { key: 'lobbies', icon: '🎮', label: 'Games' }
+    { key: 'feed', label: 'Home' },
+    { key: 'groups', label: 'Groups' },
+    { key: 'lobbies', label: 'Games' }
   ]
-  if (profile.role === 'admin') tabs.push({ key: 'admin', icon: '⚙️', label: 'Admin' })
+  if (profile.role === 'admin') tabs.push({ key: 'admin', label: 'Admin Panel' })
 
   const roleBadge = profile.role === 'admin'
     ? '<span class="badge admin">Admin</span>'
@@ -29,17 +28,15 @@ export function renderTopnav(profile, activeTab) {
           </button>
         `).join('')}
       </div>
-
-      <div class="user-control-row">
-        <!-- زنگوله نوتیفیکیشن -->
+      <div class="row" style="gap: 12px;">
+        <!-- دکمه زنگوله نوتیفیکیشن‌ها -->
         <button id="noti-bell-btn" style="background:transparent; border:none; font-size:18px; position:relative; padding:4px;">
           🔔
           <span id="noti-badge" class="presence-dot online" style="display:none; position:absolute; top:2px; left:2px; width:8px; height:8px; background:var(--danger);"></span>
         </button>
-        
-        <a href="#/profile" title="${escapeHtml(profile.nickname)}" class="row" style="gap:8px; color:inherit; text-decoration:none;">
+        ${roleBadge}
+        <a href="#/profile" title="${escapeHtml(profile.nickname)}">
           <img class="avatar sm ${neonClass(profile.neon_color)}" src="${profile.avatar_url || defaultAvatar(profile.nickname)}" alt="">
-          <span class="nav-label bold-username">${escapeHtml(profile.nickname)}</span>
         </a>
 
         <button id="logout-btn" class="nav-label" style="padding: 6px 10px; font-size:12px;">خروج</button>
@@ -78,6 +75,17 @@ export function renderTopnav(profile, activeTab) {
             فعال بودن امتیازدهی ستاره‌ای
           </label>
         </form>
+      </div>
+    </div>
+
+    <!-- دراپ‌داون نوتیفیکیشن‌ها -->
+    <div id="noti-dropdown" class="glass" style="display:none; position:absolute; top:65px; left:20px; z-index:100; width:280px; max-height:360px; overflow-y:auto; padding:10px; font-size:13px; box-shadow:var(--shadow-glass);">
+      <div class="row between" style="border-bottom:1px solid var(--glass-border); padding-bottom:6px; margin-bottom:8px;">
+        <b>اعلان‌ها (Notifications)</b>
+        <button id="clear-notis-btn" style="padding:2px 6px; font-size:11px;">خوانده شد</button>
+      </div>
+      <div id="notis-list" class="stack" style="gap:8px;">
+        <div class="text-dim" style="text-align:center; padding:10px;">هیچ اعلانی نیست</div>
       </div>
     </div>
   `
@@ -161,6 +169,7 @@ export function attachTopnav(root) {
     document.addEventListener('click', () => { dropdown.style.display = 'none' })
     dropdown.addEventListener('click', (e) => e.stopPropagation())
 
+    // گرفتن زنده اعلان‌ها از دیتابیس
     import('../lib/supabaseClient.js').then(async ({ supabase }) => {
       const { data: session } = await supabase.auth.getSession()
       const meId = session.session?.user?.id
@@ -178,6 +187,7 @@ export function attachTopnav(root) {
           const unread = notis.some(n => !n.is_read)
           notiBadge.style.display = unread ? 'block' : 'none'
 
+          // اگر نوتیفیکیشن خوانده نشده جدید آمد، صدای زنگوله پخش کن
           const localStoredCount = localStorage.getItem('noti_count') || '0'
           if (notis.length > Number(localStoredCount)) {
             playNotiSound()
@@ -203,6 +213,7 @@ export function attachTopnav(root) {
 
       loadNotifications()
 
+      // آپدیت زنده نوتیفیکیشن‌ها با اشتراک Supabase Realtime
       supabase
         .channel(`notis:${meId}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${meId}` }, () => {
@@ -225,8 +236,8 @@ function playNotiSound() {
   osc.connect(gain)
   gain.connect(audioCtx.destination)
   osc.type = 'sine'
-  osc.frequency.setValueAtTime(587.33, audioCtx.currentTime)
-  osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1)
+  osc.frequency.setValueAtTime(587.33, audioCtx.currentTime) // نت D5
+  osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1) // نت A5
   gain.gain.setValueAtTime(0.3, audioCtx.currentTime)
   gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4)
   osc.start(audioCtx.currentTime)

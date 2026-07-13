@@ -16,7 +16,7 @@ route('/login', loginPage)
 route('/feed', feedPage)
 route('/groups', (parts) => parts.length ? groupDetailPage(parts) : groupsPage())
 route('/lobbies', (parts) => parts.length ? lobbyDetailPage(parts) : lobbiesPage())
-route('/profile', (parts) => parts.length ? publicProfilePage(parts) : profilePage())
+route('/profile', (parts) => profilePage(parts)) // ارسال آرگومان‌ها به صورت مستقیم به پروفایل
 route('/admin', adminPage)
 
 setNotFound(() => {

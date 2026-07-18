@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from './navbar.js'
 import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
-import { isStaff, softDeleteMessage } from '../lib/moderation.js'
+import { isStaff, softDeleteMessage, moderatedDeleteMessage, askModReason } from '../lib/moderation.js'
 import { t } from '../lib/i18n.js'
 
 // یه رفرنس ماژول-سطح به کانال چت فعال؛ قبل از باز کردن کانال جدید
@@ -94,7 +94,7 @@ export async function mountChat(app, { targetType, targetId, me }) {
         <div class="msg-body">
           <div class="text-dim" style="font-size:12px;">
             ${escapeHtml(u.nickname)} · ${timeAgo(m.created_at)} ${m.is_edited ? '(ویرایش‌شده)' : ''}
-            ${canDelete ? `<button class="msg-delete-btn" data-id="${m.id}" title="حذف پیام">${icon('trash-can')}</button>` : ''}
+            ${canDelete ? `<button class="msg-delete-btn" data-id="${m.id}" data-author="${m.sender_id}" data-snapshot="${escapeHtml((m.content || '').slice(0, 100))}" title="${t('حذف پیام', 'Delete message')}">${icon('trash-can')}</button>` : ''}
           </div>
           <div class="bubble">
             ${m.content ? escapeHtml(m.content) : ''}
@@ -108,9 +108,19 @@ export async function mountChat(app, { targetType, targetId, me }) {
   function bindDeleteButtons() {
     scrollEl.querySelectorAll('.msg-delete-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm(t('پیام حذف بشه؟', 'Delete this message?'))) return
+        const mine = btn.dataset.author === me.id
         try {
-          await softDeleteMessage(btn.dataset.id)
+          if (mine) {
+            if (!confirm(t('پیام حذف بشه؟', 'Delete this message?'))) return
+            await softDeleteMessage(btn.dataset.id)
+          } else {
+            // حذف پیام کاربر دیگه توسط مدیر: دلیل اجباری + لاگ سایت
+            const reason = askModReason(t('حذف این پیام', 'deleting this message'))
+            if (!reason) return
+            await moderatedDeleteMessage(me, btn.dataset.id, btn.dataset.author, btn.dataset.snapshot, reason)
+          }
+          // realtime آپدیت می‌کنه ولی برای اطمینان دستی هم رفرش می‌کنیم
+          loadMessages()
         } catch (err) { toast(err.message, { error: true }) }
       })
     })

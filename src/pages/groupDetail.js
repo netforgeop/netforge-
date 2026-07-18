@@ -4,7 +4,7 @@ import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
 import { chatMarkup, mountChat } from '../components/chat.js'
 import { escapeHtml, toast, icon } from '../lib/utils.js'
-import { isStaff } from '../lib/moderation.js'
+import { isStaff, askModReason, logModAction } from '../lib/moderation.js'
 import { t } from '../lib/i18n.js'
 
 export default async function groupDetailPage([groupId]) {
@@ -293,12 +293,25 @@ export default async function groupDetailPage([groupId]) {
 
         // حذف کامل گروه (دوتا تأیید برای اطمینان)
         app.querySelector('#delete-group-btn')?.addEventListener('click', async (e) => {
+          // اگر مدیرِ پلتفرم روی گروه کس دیگه‌ست → اول دلیل اجباری (بعد توی لاگ می‌ره)
+          let staffReason = null
+          if (group.created_by !== profile.id) {
+            staffReason = askModReason(t('حذف این گروه', 'deleting this group'))
+            if (!staffReason) return
+          }
           if (!confirm(t('گروه با همه‌ی پیام‌ها و اعضاش برای همیشه حذف بشه؟', 'Delete the group with all messages and members forever?'))) return
           if (!confirm(t('واقعاً مطمئنی؟ این کار برگشت‌ناپذیره!', 'Are you sure? This cannot be undone!'))) return
           e.target.disabled = true
           try {
             const { error: delErr } = await supabase.rpc('delete_group', { p_group_id: groupId })
             if (delErr) throw delErr
+            if (staffReason) {
+              await logModAction(profile, {
+                action: 'delete_group', targetType: 'group', targetId: groupId,
+                targetUserId: group.created_by, reason: staffReason,
+                snapshot: `${t('گروه', 'Group')}: ${group.name}`
+              })
+            }
             toast(t('گروه حذف شد', 'Group deleted'))
             window.location.hash = '/groups'
           } catch (err) {

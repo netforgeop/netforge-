@@ -164,6 +164,42 @@ export default async function publicProfilePage(parts = []) {
     }
 
     // نکته: رنگِ «کل سایت» (دکمه‌ها و اکسنت‌ها) از انتخابِ خودِ کاربر لاگین‌شده
+    // ── کارت «اقدامات مدیریتی روی حساب من» — فقط خودِ کاربر می‌بینه ──
+    let myModLogCard = ''
+    if (isMe) {
+      const { data: myModLog } = await supabase
+        .from('mod_actions')
+        .select('*')
+        .eq('target_user_id', myProfile.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      if (myModLog && myModLog.length) {
+        const lbl = {
+          delete_post: t('پستت پاک شد', 'your post was deleted'),
+          delete_comment: t('کامنتت پاک شد', 'your comment was deleted'),
+          delete_lobby_comment: t('کامنت لابی‌ات پاک شد', 'your lobby comment was deleted'),
+          delete_message: t('پیامت پاک شد', 'your message was deleted'),
+          ban: t('حسابت بن شد', 'your account was banned'),
+          mute: t('میوت شدی', 'you were muted'),
+          timeout: t('تایم‌اوت شدی', 'you got a timeout')
+        }
+        myModLogCard = `
+          <div class="glass card" style="margin-top:15px;">
+            <h3>${icon('clipboard-list')} ${t('اقدامات مدیریتی روی حساب من', 'Moderation actions on my account')}</h3>
+            <p class="text-dim" style="font-size:12px;">${t('این لیست فقط برای خودته — هر بار مدیریت چیزی ازت پاک کنه یا محدودیت بزنه، با دلیلش این‌جا میاد.', 'Only visible to you — moderation actions on your content with reasons.')}</p>
+            ${myModLog.map(m => `
+              <div style="margin-bottom:8px; border-top:1px solid var(--glass-border); padding-top:8px; font-size:13px;">
+                <b>${lbl[m.action] || m.action}</b>
+                <span class="text-dim" style="font-size:11px;"> · ${new Date(m.created_at).toLocaleString(dateLocale())}</span>
+                ${m.reason ? `<div class="text-dim">${t('دلیل:', 'Reason:')} ${escapeHtml(m.reason)}</div>` : ''}
+                ${m.snapshot ? `<div class="text-dim" style="font-size:11px; opacity:.75;">${escapeHtml(m.snapshot)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `
+      }
+    }
+
     // ── کارت «درخواست‌های فالو» فقط روی پروفایل خودم ──
     // (باگ QA: قبلاً هیچ راهی برای قبول کردن فالو توی UI وجود نداشت)
     let followReqCard = ''
@@ -248,6 +284,8 @@ export default async function publicProfilePage(parts = []) {
         ${followReqCard}
 
         ${inviteCard}
+
+        ${myModLogCard}
 
         ${profile.profile_music_url ? `
           <div class="glass card music-card" style="margin-top: 20px;">

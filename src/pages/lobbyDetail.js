@@ -4,6 +4,7 @@ import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
 import { chatMarkup, mountChat } from '../components/chat.js'
 import { escapeHtml, toast, icon } from '../lib/utils.js'
+import { isStaff, askModReason, logModAction } from '../lib/moderation.js'
 import { t } from '../lib/i18n.js'
 
 export default async function lobbyDetailPage([lobbyId]) {
@@ -30,6 +31,7 @@ export default async function lobbyDetailPage([lobbyId]) {
       <a href="#/lobbies">${t('→ بازگشت به لابی‌ها', '← Back to lobbies')}</a>
       <div class="row" style="margin-top:10px; flex-wrap:wrap;">
         <h2 style="margin:0;">${escapeHtml(lobby.game_name)}</h2>
+        ${lobby.is_public === false ? `<span class="privacy-badge private">${icon('lock')} ${t('خصوصی (فقط دعوتی)', 'Private (invite only)')}</span>` : ''}
         ${lobby.category ? `<span class="badge">${escapeHtml(lobby.category)}</span>` : ''}
         ${status === 'closed' ? `<span class="privacy-badge private">${icon('lock')} ${t('بسته', 'Closed')}</span>` : ''}
       </div>
@@ -110,6 +112,12 @@ export default async function lobbyDetailPage([lobbyId]) {
                 <option value="closed" ${status === 'closed' ? 'selected' : ''}>${t('بسته — جوین جدید نمی‌پذیره', 'Closed — no new joins')}</option>
               </select>
 
+              <label class="text-dim">${t('حریم خصوصی', 'Privacy')}</label>
+              <select name="is_public">
+                <option value="public" ${lobby.is_public !== false ? 'selected' : ''}>${t('عمومی — توی لیست دیده می‌شه، جوین آزاد', 'Public — listed, free join')}</option>
+                <option value="private" ${lobby.is_public === false ? 'selected' : ''}>${t('خصوصی — مخفی از لیست، فقط با دعوت‌نامه', 'Private — hidden, invite only')}</option>
+              </select>
+
               <button class="primary" type="submit">${icon('floppy-disk')} ${t('ذخیره تغییرات', 'Save changes')}</button>
             </form>
             <div class="danger-zone">
@@ -150,7 +158,11 @@ export default async function lobbyDetailPage([lobbyId]) {
               window.location.reload()
             } catch (err) {
               const msg = String(err.message || '')
-              toast(msg.includes('row-level security') ? t('نتوانستی بپیوندی — ظرفیت لابی پر شده یا بسته است', "Couldn't join — lobby is full or closed") : msg, { error: true })
+              toast(msg.includes('row-level security')
+                ? (lobby.is_public === false
+                    ? t('این لابی خصوصیه — فقط با دعوت‌نامه می‌شه جوین شد', 'This lobby is private — invite required')
+                    : t('نتوانستی بپیوندی — ظرفیت لابی پر شده یا بسته است', "Couldn't join — lobby is full or closed"))
+                : msg, { error: true })
               e.target.disabled = false
             }
           })
@@ -227,7 +239,8 @@ export default async function lobbyDetailPage([lobbyId]) {
               category: fd.get('category')?.trim() || null,
               description: fd.get('description')?.trim() || null,
               capacity: Math.max(Number(fd.get('capacity')) || 2, members?.length || 1),
-              status: fd.get('status') || 'open'
+              status: fd.get('status') || 'open',
+              is_public: fd.get('is_public') === 'public'
             }).eq('id', lobbyId)
             if (updErr) throw updErr
             toast(t('تنظیمات لابی ذخیره شد', 'Lobby settings saved'))
@@ -240,12 +253,25 @@ export default async function lobbyDetailPage([lobbyId]) {
 
         // حذف کامل لابی
         app.querySelector('#delete-lobby-btn')?.addEventListener('click', async (e) => {
+          // اگر مدیرِ پلتفرم روی لابی کس دیگه‌ست → اول دلیل اجباری (بعد لاگ می‌شه)
+          let staffReason = null
+          if (lobby.host_id !== profile.id) {
+            staffReason = askModReason(t('حذف این لابی', 'deleting this lobby'))
+            if (!staffReason) return
+          }
           if (!confirm(t('لابی با همه‌ی پیام‌هاش برای همیشه حذف بشه؟', 'Delete the lobby with all its messages forever?'))) return
           if (!confirm(t('واقعاً مطمئنی؟ این کار برگشت‌ناپذیره!', 'Are you sure? This cannot be undone!'))) return
           e.target.disabled = true
           try {
             const { error: delErr } = await supabase.rpc('delete_lobby', { p_lobby_id: lobbyId })
             if (delErr) throw delErr
+            if (staffReason) {
+              await logModAction(profile, {
+                action: 'delete_lobby', targetType: 'lobby', targetId: lobbyId,
+                targetUserId: lobby.host_id, reason: staffReason,
+                snapshot: `${t('لابی', 'Lobby')}: ${lobby.game_name}`
+              })
+            }
             toast(t('لابی حذف شد', 'Lobby deleted'))
             window.location.hash = '/lobbies'
           } catch (err) {

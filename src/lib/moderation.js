@@ -82,6 +82,35 @@ export async function getActiveSanctionFor(userId) {
 }
 
 // --------------------------------------------------------------------
+// لاگ اقدامات مدیریتی — هر حذف/محدودیت با «دلیل» ثبت می‌شه تا توی
+// «لاگ سایت» (پنل ادمین) و کارت «اقدامات روی حساب من» (پروفایل خود کاربر) بیاد
+// --------------------------------------------------------------------
+export async function logModAction(me, { action, targetType = 'user', targetId = null, targetUserId = null, reason = '', snapshot = null }) {
+  if (!isStaff(me)) return
+  const { error } = await supabase.from('mod_actions').insert({
+    actor_id: me.id,
+    action,
+    target_type: targetType,
+    target_id: targetId,
+    target_user_id: targetUserId,
+    reason: reason || '',
+    snapshot
+  })
+  if (error) console.warn('mod action log failed:', error.message)
+}
+
+// گرفتن دلیل از مدیر — برای حذف/محدودیت «اجباری» است؛ null = لغو شد
+export function askModReason(what) {
+  const reason = prompt(t(`دلیل ${what} رو بنویس (اجباری — توی لاگ سایت و پروفایل کاربر دیده می‌شه):`, `Reason for this action (required — shown in the site log and the user's profile):`))
+  if (reason === null) return null
+  if (!reason.trim()) {
+    toast(t('نوشتن دلیل اجباریه', 'A reason is required'), { error: true })
+    return null
+  }
+  return reason.trim()
+}
+
+// --------------------------------------------------------------------
 // حذف محتوا توسط مدیران (پست، کامنت پست، پیام چت)
 // توجه: کاربر عادی فقط محتوای خودش را می‌تواند حذف کند (با RLS قبلی)
 // --------------------------------------------------------------------
@@ -90,9 +119,29 @@ export async function deletePostAsStaff(postId) {
   if (error) throw error
 }
 
+// حذف پستِ کاربر دیگه توسط مدیر — با دلیل اجباری + لاگ
+export async function moderatedDeletePost(me, post, reason) {
+  await deletePostAsStaff(post.id)
+  await logModAction(me, {
+    action: 'delete_post', targetType: 'post', targetId: post.id,
+    targetUserId: post.author_id, reason,
+    snapshot: (post.caption || '').slice(0, 120) || t('(بدون کپشن)', '(no caption)')
+  })
+}
+
 export async function deleteCommentAsStaff(commentId) {
   const { error } = await supabase.from('post_comments').delete().eq('id', commentId)
   if (error) throw error
+}
+
+// حذف کامنتِ کاربر دیگه توسط مدیر — با دلیل اجباری + لاگ
+export async function moderatedDeleteComment(me, comment, reason) {
+  await deleteCommentAsStaff(comment.id)
+  await logModAction(me, {
+    action: 'delete_comment', targetType: 'comment', targetId: comment.id,
+    targetUserId: comment.author_id, reason,
+    snapshot: (comment.content || '').slice(0, 120)
+  })
 }
 
 export async function softDeleteMessage(messageId) {
@@ -101,6 +150,16 @@ export async function softDeleteMessage(messageId) {
     .update({ is_deleted: true, content: null, attachment_url: null })
     .eq('id', messageId)
   if (error) throw error
+}
+
+// حذف پیامِ کاربر دیگه توسط مدیر — با دلیل اجباری + لاگ
+export async function moderatedDeleteMessage(me, messageId, authorId, snapshot, reason) {
+  await softDeleteMessage(messageId)
+  await logModAction(me, {
+    action: 'delete_message', targetType: 'message', targetId: messageId,
+    targetUserId: authorId, reason,
+    snapshot: (snapshot || '').slice(0, 120)
+  })
 }
 
 // --------------------------------------------------------------------
@@ -133,7 +192,7 @@ export function openSanctionModal(me, targetUser, onDone) {
           <option value="">${t('دائم (تا رفع دستی)', 'Permanent (until lifted)')}</option>
         </select>
 
-        <label class="text-dim">${t('دلیل (اختیاری)', 'Reason (optional)')}</label>
+        <label class="text-dim">${t('دلیل (اجباری)', 'Reason (required)')}</label>
         <input id="sm-reason" placeholder="${t('مثلاً: اسپم در چت گروه', 'e.g. spam in group chat')}" />
 
         <button class="danger" id="sm-apply">${t('اعمال محدودیت', 'Apply restriction')}</button>
@@ -152,7 +211,18 @@ export function openSanctionModal(me, targetUser, onDone) {
       const durVal = wrap.querySelector('#sm-duration').value
       const minutes = durVal === '' ? null : Number(durVal)
       const reason = wrap.querySelector('#sm-reason').value.trim()
+      // دلیل اجباریه (الزام کاربر: حذف و بن باید دلیل داشته باشه)
+      if (!reason) {
+        toast(t('نوشتن دلیل اجباریه', 'A reason is required'), { error: true })
+        btn.disabled = false
+        return
+      }
       await applySanction(me, { userId: targetUser.id, type, minutes, reason })
+      await logModAction(me, {
+        action: type, targetType: 'user', targetId: targetUser.id,
+        targetUserId: targetUser.id, reason,
+        snapshot: minutes ? t(`${minutes} دقیقه`, `${minutes} minutes`) : t('دائم', 'permanent')
+      })
       toast(t(`محدودیت ${type} روی ${targetUser.nickname} اعمال شد`, `Restriction ${type} applied to ${targetUser.nickname}`))
       wrap.remove()
       onDone?.()

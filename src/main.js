@@ -17,12 +17,14 @@ import lobbyDetailPage from './pages/lobbyDetail.js'
 import profilePage from './pages/profile.js'
 import publicProfilePage from './pages/publicProfile.js'
 import adminPage from './pages/admin.js'
+import ticketsPage from './pages/tickets.js'
 
 route('/login', loginPage)
 route('/feed', feedPage)
 route('/groups', (parts) => parts.length ? groupDetailPage(parts) : groupsPage())
 route('/lobbies', (parts) => parts.length ? lobbyDetailPage(parts) : lobbiesPage())
 route('/profile', (parts) => profilePage(parts)) // ارسال آرگومان‌ها به صورت مستقیم به پروفایل
+route('/tickets', ticketsPage)
 route('/admin', adminPage)
 
 setNotFound(() => {

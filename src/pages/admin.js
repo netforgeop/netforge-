@@ -4,6 +4,22 @@ import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { liftSanction } from '../lib/moderation.js'
 import { t, dateLocale } from '../lib/i18n.js'
 
+// برچسب اکشن‌های لاگ سایت (بایلینگوال)
+function actionLabel(a) {
+  const map = {
+    delete_post: t('پست پاک کرد', 'deleted a post'),
+    delete_comment: t('کامنت پاک کرد', 'deleted a comment'),
+    delete_lobby_comment: t('کامنت لابی پاک کرد', 'deleted a lobby comment'),
+    delete_message: t('پیام پاک کرد', 'deleted a message'),
+    delete_group: t('گروه پاک کرد', 'deleted a group'),
+    delete_lobby: t('لابی پاک کرد', 'deleted a lobby'),
+    ban: t('بن کرد', 'banned'),
+    mute: t('میوت کرد', 'muted'),
+    timeout: t('تایم‌اوت داد', 'timed out')
+  }
+  return map[a] || a
+}
+
 export default async function adminPage() {
   return withShell('admin', async (profile) => {
     if (profile.role !== 'admin') {
@@ -15,13 +31,15 @@ export default async function adminPage() {
       { data: requests },
       { data: reports },
       { data: users },
-      { data: sanctions }
+      { data: sanctions },
+      { data: modLog }
     ] = await Promise.all([
       supabase.from('invite_codes').select('*').order('created_at', { ascending: false }),
       supabase.from('invite_requests').select('*, requester:users!invite_requests_requested_by_fkey(nickname)').eq('status', 'pending').order('requested_at'),
       supabase.from('reports').select('*, reporter:users!reports_reporter_id_fkey(nickname)').eq('status', 'pending').order('created_at', { ascending: false }),
       supabase.from('users').select('id, nickname, role, created_at').order('created_at'),
-      supabase.from('user_sanctions').select('*, target:users!user_sanctions_user_id_fkey(nickname)').eq('is_active', true).order('created_at', { ascending: false })
+      supabase.from('user_sanctions').select('*, target:users!user_sanctions_user_id_fkey(nickname)').eq('is_active', true).order('created_at', { ascending: false }),
+      supabase.from('mod_actions').select('*, actor:users!mod_actions_actor_id_fkey(nickname), target:users!mod_actions_target_user_id_fkey(nickname)').order('created_at', { ascending: false }).limit(50)
     ])
 
     const html = `
@@ -92,6 +110,25 @@ export default async function adminPage() {
         <p class="text-dim" style="font-size:12px; margin-top:10px;">
           ${t(`برای اعمال محدودیت جدید، به پروفایل کاربر بروید و روی «اعمال محدودیت جدید» بزنید.`, `To apply a new restriction, visit the user's profile and use the moderation card.`)}
         </p>
+      </div>
+
+      <div class="glass card">
+        <h3>${icon('clipboard-list')} ${t('لاگ سایت — اقدامات مدیریتی', 'Site log — moderation actions')}</h3>
+        <p class="text-dim" style="font-size:12px;">${t('هر حذف/محدودیتی این‌جا ثبت می‌شه: کی، روی کی، چرا و چه زمانی.', 'Every deletion/restriction is recorded: who, on whom, why, and when.')}</p>
+        ${modLog === null || modLog === undefined
+          ? `<p class="text-dim">${t('جدول mod_actions هنوز ساخته نشده؛ فایل netforge_v5.sql را اجرا کنید.', 'mod_actions table missing — run netforge_v5.sql.')}</p>`
+          : (modLog.length ? modLog.map(m => `
+            <div style="margin-bottom:10px; border-bottom:1px solid var(--glass-border); padding-bottom:8px; font-size:13px;">
+              <div>
+                <b>${escapeHtml(m.actor?.nickname || '—')}</b>
+                <span>${actionLabel(m.action)}</span>
+                ${m.target?.nickname ? `<b>${escapeHtml(m.target.nickname)}</b>` : ''}
+                <span class="text-dim" style="font-size:11px;"> · ${new Date(m.created_at).toLocaleString(dateLocale())}</span>
+              </div>
+              ${m.reason ? `<div class="text-dim">${t('دلیل:', 'Reason:')} ${escapeHtml(m.reason)}</div>` : ''}
+              ${m.snapshot ? `<div class="text-dim" style="font-size:11px; opacity:.8;">${escapeHtml(m.snapshot)}</div>` : ''}
+            </div>
+          `).join('') : `<p class="text-dim">${t('هنوز اقدامی ثبت نشده.', 'No actions logged yet.')}</p>`)}
       </div>
 
       <div class="glass card">

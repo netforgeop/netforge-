@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
 import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
-import { isStaff } from '../lib/moderation.js'
+import { isStaff, askModReason } from '../lib/moderation.js'
 import { t } from '../lib/i18n.js'
 
 const STATUS_LABEL = { open: 'باز', full: 'پر', closed: 'بسته' }
@@ -42,6 +42,10 @@ export default async function lobbiesPage() {
           <input name="category" placeholder="${t('دسته‌بندی (اختیاری، مثلاً رقابتی/کژوال)', 'Category (optional, e.g. ranked/casual)')}" />
           <textarea name="description" placeholder="${t('دنبال چه کسی می‌گردی؟', 'Who are you looking for?')}" rows="2"></textarea>
           <input name="capacity" type="number" min="2" max="50" value="5" />
+          <select name="is_public">
+            <option value="public">${t('لابی عمومی — توی لیست دیده می‌شه، جوین آزاد', 'Public lobby — listed, free join')}</option>
+            <option value="private">${t('لابی خصوصی — مخفی از لیست، فقط با دعوت‌نامه', 'Private lobby — hidden, invite only')}</option>
+          </select>
           <button class="primary" type="submit">${t('ساخت لابی', 'Create lobby')}</button>
         </form>
       </div>
@@ -70,7 +74,7 @@ function renderLobby(lobby, me, allComments, allReactions) {
     <div class="glass card" data-lobby-id="${lobby.id}">
       <div class="row between">
         <div>
-          <div class="row"><b>${escapeHtml(lobby.game_name)}</b> ${lobby.category ? `<span class="badge">${escapeHtml(lobby.category)}</span>` : ''}</div>
+          <div class="row"><b>${escapeHtml(lobby.game_name)}</b> ${lobby.is_public === false ? `<span class="privacy-badge private">${icon('lock')} ${t('خصوصی', 'Private')}</span>` : ''} ${lobby.category ? `<span class="badge">${escapeHtml(lobby.category)}</span>` : ''}</div>
           <p class="text-dim" style="margin:6px 0;">${escapeHtml(lobby.description || '')}</p>
           <span class="text-dim" style="font-size:12px;">
             ${t('میزبان', 'Host')}: ${escapeHtml(host.nickname)} · ${members.length}/${lobby.capacity} · ${statusLabel(lobby.status)} · ${timeAgo(lobby.last_activity_at)}
@@ -101,14 +105,14 @@ function renderLobby(lobby, me, allComments, allReactions) {
 function lobbyActionBtn(lobby, isMember, isFull) {
   if (isMember) return `<a href="#/lobbies/${lobby.id}"><button class="primary">${t('ورود به چت', 'Enter chat')}</button></a>`
   if (isFull) return `<button disabled>${t('ظرفیت پره', 'Full')}</button>`
-  return `<button class="join-lobby-btn" data-join-lobby-id="${lobby.id}">${t('پیوستن', 'Join')}</button>`
+  return `<button class="join-lobby-btn" data-join-lobby-id="${lobby.id}" data-is-private="${lobby.is_public === false ? '1' : ''}">${t('پیوستن', 'Join')}</button>`
 }
 
 function lobbyCommentRowHtml(c, me) {
   return `
     <div class="row between" data-comment-id="${c.id}">
       <span><b>${escapeHtml(c.author?.nickname)}</b>: ${escapeHtml(c.content)}</span>
-      ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-lobby-comment-btn" data-id="${c.id}" title="${t('حذف کامنت', 'Delete comment')}" style="background:transparent;border:none;color:var(--danger);padding:0 6px;font-size:11px;opacity:.55;">${icon('xmark')}</button>` : ''}
+      ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-lobby-comment-btn" data-id="${c.id}" data-author="${c.author_id}" data-content="${escapeHtml((c.content || '').replace(/"/g, '&quot;').slice(0, 100))}" title="${t('حذف کامنت', 'Delete comment')}" style="background:transparent;border:none;color:var(--danger);padding:0 6px;font-size:11px;opacity:.55;">${icon('xmark')}</button>` : ''}
     </div>
   `
 }
@@ -128,7 +132,11 @@ function bindLobbyCard(card, me) {
       window.location.reload()
     } catch (err) {
       const msg = String(err.message || '')
-      toast(msg.includes('row-level security') ? t('نتوانستی بپیوندی — ظرفیت لابی پر شده یا بسته است', "Couldn't join — lobby is full or closed") : msg, { error: true })
+      toast(msg.includes('row-level security')
+        ? (btn.dataset.isPrivate === '1'
+            ? t('این لابی خصوصیه — فقط با دعوت‌نامه می‌شه جوین شد', 'This lobby is private — invite required')
+            : t('نتوانستی بپیوندی — ظرفیت لابی پر شده یا بسته است', "Couldn't join — lobby is full or closed"))
+        : msg, { error: true })
       btn.disabled = false
     }
   })
@@ -152,8 +160,8 @@ function bindLobbyCard(card, me) {
     })
   })
 
-  // حذف کامنت لابی (نویسنده یا مدیر)
-  bindLobbyCommentDeleteButtons(card)
+  // حذف کامنت لابی (نویسنده بدون دلیل | مدیریت با دلیل اجباری + لاگ)
+  bindLobbyCommentDeleteButtons(card, me)
 
   // فرستادن کامنت — ظاهر شدنش با realtime اتفاق می‌افته (رفرش لازم نیست)
   const commentForm = card.querySelector('.lobby-comment-form')
@@ -172,15 +180,30 @@ function bindLobbyCard(card, me) {
   })
 }
 
-function bindLobbyCommentDeleteButtons(scope) {
+function bindLobbyCommentDeleteButtons(scope, me) {
   scope.querySelectorAll('.delete-lobby-comment-btn').forEach(btn => {
     if (btn.dataset.bound) return
     btn.dataset.bound = '1'
     btn.addEventListener('click', async () => {
-      if (!confirm(t('کامنت حذف بشه؟', 'Delete this comment?'))) return
+      const mine = btn.dataset.author === me.id
       try {
-        const { error } = await supabase.from('lobby_comments').delete().eq('id', btn.dataset.id)
-        if (error) throw error
+        if (mine) {
+          if (!confirm(t('کامنت حذف بشه؟', 'Delete this comment?'))) return
+          const { error } = await supabase.from('lobby_comments').delete().eq('id', btn.dataset.id)
+          if (error) throw error
+        } else {
+          const reason = askModReason(t('حذف این کامنت', 'deleting this comment'))
+          if (!reason) return
+          const { error } = await supabase.from('lobby_comments').delete().eq('id', btn.dataset.id)
+          if (error) throw error
+          // لاگ اقدام مدیریتی (با همون برچسب کامنت لابی)
+          const { logModAction } = await import('../lib/moderation.js')
+          await logModAction(me, {
+            action: 'delete_lobby_comment', targetType: 'lobby_comment', targetId: btn.dataset.id,
+            targetUserId: btn.dataset.author, reason,
+            snapshot: (btn.dataset.content || '').slice(0, 120)
+          })
+        }
         toast(t('کامنت حذف شد', 'Comment deleted'))
         btn.closest('[data-comment-id]')?.remove()
       } catch (err) { toast(err.message, { error: true }) }
@@ -219,7 +242,8 @@ function mountLobbies(app, me) {
           description: fd.get('description')?.trim() || null,
           capacity: Number(fd.get('capacity')) || 5,
           host_id: me.id,
-          status: 'open'
+          status: 'open',
+          is_public: fd.get('is_public') === 'public'
         })
         if (error) throw error
         toast(t('لابی ساخته شد', 'Lobby created'))
@@ -285,7 +309,7 @@ function setupLobbiesRealtime(me) {
     const container = card.querySelector('.lobby-comments-list')
     if (!container) return
     container.insertAdjacentHTML('beforeend', lobbyCommentRowHtml(full || c, me))
-    bindLobbyCommentDeleteButtons(container)
+    bindLobbyCommentDeleteButtons(container, me)
   })
 
   // کامنت حذف‌شده لابی → محو

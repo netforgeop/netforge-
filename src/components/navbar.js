@@ -19,7 +19,11 @@ const NOTI_ICONS = {
   group_invite: 'users',
   group_join_request: 'user-plus',
   group_accepted: 'circle-check',
-  group_rejected: 'circle-xmark'
+  group_rejected: 'circle-xmark',
+  comment_like: 'heart',
+  comment_reply: 'reply',
+  ticket_new: 'life-ring',
+  ticket_reply: 'reply'
 }
 
 function notiLink(n) {
@@ -40,6 +44,10 @@ function notiLink(n) {
     case 'post_reaction':
     case 'post_rating': return '#/feed'
     case 'invite_ready': return '#/profile'
+    case 'ticket_new':
+    case 'ticket_reply': return '#/tickets'
+    case 'comment_like':
+    case 'comment_reply': return '#/feed'
     default: return `#/profile/${n.sender_id}`
   }
 }
@@ -56,7 +64,8 @@ export function renderTopnav(profile, activeTab) {
     { key: 'feed', label: t('خانه', 'Home'), icon: 'house' },
     { key: 'new-post', label: t('پست جدید', 'New Post'), icon: 'square-plus' },
     { key: 'groups', label: t('گروه‌ها', 'Groups'), icon: 'users' },
-    { key: 'lobbies', label: t('بازی‌ها', 'Games'), icon: 'gamepad' }
+    { key: 'lobbies', label: t('بازی‌ها', 'Games'), icon: 'gamepad' },
+    { key: 'tickets', label: t('پشتیبانی', 'Support'), icon: 'life-ring' }
   ]
   if (profile.role === 'admin') tabs.push({ key: 'admin', label: t('پنل مدیریت', 'Admin Panel'), icon: 'shield-halved' })
 

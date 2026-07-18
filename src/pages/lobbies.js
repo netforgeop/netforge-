@@ -123,7 +123,9 @@ function mountLobbies(app, me) {
         if (error) throw error
         window.location.reload()
       } catch (err) {
-        toast(err.message, { error: true })
+        // پیام قابل‌فهم به‌جای خطای خام RLS (ظرفیت پر یا لابی بسته)
+        const msg = String(err.message || '')
+        toast(msg.includes('row-level security') ? 'نتوانستی بپیوندی — ظرفیت لابی پر شده یا بسته است 🔒' : msg, { error: true })
         btn.disabled = false
       }
     })

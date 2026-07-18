@@ -14,7 +14,7 @@ export async function isNicknameTaken(nickname) {
 
 export async function signUp({ nickname, inviteCode, password }) {
   const valid = await checkInviteCode(inviteCode)
-  if (!valid) throw new Error('کد دعوت نامعتبر یا منقضی‌شده است')
+  if (!valid) throw new Error('کد دعوت نامعتبر یا منقضی‌شده است (به حروف بزرگ و کوچک حساس است — دقیقاً همان شکلی که گرفتی بنویس)')
 
   const taken = await isNicknameTaken(nickname)
   if (taken) throw new Error('این نیک‌نیم قبلاً گرفته شده')

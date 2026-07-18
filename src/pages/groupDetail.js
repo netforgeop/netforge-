@@ -65,7 +65,11 @@ export default async function groupDetailPage([groupId]) {
         </div>
       </div>
 
-      ${chatMarkup()}
+      ${(myMembership || isGroupAdmin || isPlatformStaff) ? chatMarkup() : `
+        <div class="glass card text-dim" style="text-align:center; padding:24px;">
+          👀 فقط اعضای گروه می‌تونن چت رو ببینن و پیام بفرستن.
+        </div>
+      `}
     `
 
     return {
@@ -73,7 +77,9 @@ export default async function groupDetailPage([groupId]) {
       mount: async (app) => {
         app.querySelectorAll('.approve-btn').forEach(btn => btn.addEventListener('click', () => reviewRequest(app, btn.dataset.req, true)))
         app.querySelectorAll('.reject-btn').forEach(btn => btn.addEventListener('click', () => reviewRequest(app, btn.dataset.req, false)))
-        await mountChat(app, { targetType: 'group', targetId: groupId, me: profile })
+        if (myMembership || isGroupAdmin || isPlatformStaff) {
+          await mountChat(app, { targetType: 'group', targetId: groupId, me: profile })
+        }
       }
     }
   })

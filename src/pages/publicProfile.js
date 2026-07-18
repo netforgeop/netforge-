@@ -115,6 +115,40 @@ export default async function publicProfilePage(parts = []) {
     }
 
     // نکته: رنگِ «کل سایت» (دکمه‌ها و اکسنت‌ها) از انتخابِ خودِ کاربر لاگین‌شده
+    // ── کارت «درخواست‌های فالو» فقط روی پروفایل خودم ──
+    // (باگ QA: قبلاً هیچ راهی برای قبول کردن فالو توی UI وجود نداشت)
+    let followReqCard = ''
+    let pendingFollowers = []
+    if (isMe) {
+      const { data } = await supabase
+        .from('follows')
+        .select('id, follower_id, follower:users!follows_follower_id_fkey(nickname, avatar_url, neon_color)')
+        .eq('following_id', myProfile.id)
+        .eq('status', 'pending')
+      pendingFollowers = data || []
+      if (pendingFollowers.length) {
+        followReqCard = `
+          <div class="glass card" style="margin-top:15px;">
+            <h3>👋 درخواست‌های فالو (${pendingFollowers.length})</h3>
+            <div class="stack" style="gap:10px;">
+              ${pendingFollowers.map(f => `
+                <div class="row between">
+                  <a href="#/profile/${f.follower_id}" class="row" style="color:inherit; text-decoration:none;">
+                    <img class="avatar sm ${neonClass(f.follower?.neon_color)}" src="${escapeHtml(f.follower?.avatar_url || defaultAvatar(f.follower?.nickname))}">
+                    <b>${escapeHtml(f.follower?.nickname || '')}</b>
+                  </a>
+                  <div class="row" style="gap:6px;">
+                    <button class="follow-req-accept primary" data-id="${f.id}" style="padding:4px 14px; font-size:12px;">✓ قبول</button>
+                    <button class="follow-req-decline danger" data-id="${f.id}" style="padding:4px 14px; font-size:12px;">✕ رد</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `
+      }
+    }
+
     // میاد و روی <body> نشسته می‌شه (در shell.js با applyAccent). پس دیگه کل
     // کانتینر پروفایل رو با تم طرف رنگ نمی‌کنیم تا با حالت روز/شب قاتی نشه؛
     // فقط حلقه‌ی نئون دور آواتار رنگِ انتخابیِ صاحب پروفایل رو نشون می‌ده.
@@ -124,7 +158,7 @@ export default async function publicProfilePage(parts = []) {
         <header class="profile-header">
           <div class="profile-avatar-container">
             <div class="avatar-wrapper ${neonClass(profile.neon_color)}">
-              <img class="avatar lg" src="${profile.avatar_url || defaultAvatar(profile.nickname)}">
+              <img class="avatar lg" src="${escapeHtml(profile.avatar_url || defaultAvatar(profile.nickname))}">
             </div>
           </div>
           
@@ -159,6 +193,8 @@ export default async function publicProfilePage(parts = []) {
         </header>
 
         ${staffSection}
+
+        ${followReqCard}
 
         ${inviteCard}
 
@@ -277,9 +313,43 @@ export default async function publicProfilePage(parts = []) {
               toast('درخواست کد دعوت ثبت شد؛ بعد از تایید ادمین کد را همین‌جا می‌بینی')
               window.location.reload()
             } catch (err) {
-              toast(err.message, { error: true })
+              // ایندکس یونیک pending سرور هم جلوی درخواست تکراری رو می‌گیره
+              const msg = String(err.message || '')
+              toast(msg.includes('duplicate') ? 'یک درخواست در انتظار تأیید داری ⏳' : msg, { error: true })
               reqInviteBtn.disabled = false
             }
+          })
+
+          // ── دکمه‌های قبول/رد درخواست فالو (کارت پروفایل) ──
+          app.querySelectorAll('.follow-req-accept, .follow-req-decline').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const accept = btn.classList.contains('follow-req-accept')
+              const rowId = btn.dataset.id
+              const followerId = pendingFollowers.find(f => f.id === rowId)?.follower_id
+              btn.disabled = true
+              try {
+                if (accept) {
+                  const { error } = await supabase.from('follows').update({ status: 'accepted' }).eq('id', rowId)
+                  if (error) throw error
+                  if (followerId) {
+                    await supabase.from('notifications').insert({
+                      user_id: followerId,
+                      sender_id: myProfile.id,
+                      type: 'follow_accept',
+                      message: `${myProfile.nickname} درخواست فالوت رو قبول کرد 🎉`
+                    })
+                  }
+                  toast('درخواست فالو قبول شد ✅')
+                } else {
+                  await supabase.from('follows').delete().eq('id', rowId)
+                  toast('درخواست فالو رد شد')
+                }
+                window.location.reload()
+              } catch (err) {
+                toast(err.message, { error: true })
+                btn.disabled = false
+              }
+            })
           })
 
           // ── دکمه‌های کپی کد دعوت ──

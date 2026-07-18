@@ -56,7 +56,7 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
       <div class="post-header row between">
         <div class="row">
           <a href="#/profile/${post.author_id}" class="row" style="color:inherit; text-decoration:none; gap:10px;">
-            <img class="avatar sm ${neonClass(author.neon_color)}" src="${author.avatar_url || defaultAvatar(author.nickname)}">
+            <img class="avatar sm ${neonClass(author.neon_color)}" src="${escapeHtml(author.avatar_url || defaultAvatar(author.nickname))}">
             <div class="meta">
               <span class="name">${escapeHtml(author.nickname)}</span>
             </div>

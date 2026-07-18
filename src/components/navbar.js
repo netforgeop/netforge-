@@ -49,7 +49,7 @@ export function renderTopnav(profile, activeTab) {
         </button>
         ${roleBadge}
         <a href="#/profile" title="${escapeHtml(profile.nickname)}">
-          <img class="avatar sm ${neonClass(profile.neon_color)}" src="${profile.avatar_url || defaultAvatar(profile.nickname)}" alt="">
+          <img class="avatar sm ${neonClass(profile.neon_color)}" src="${escapeHtml(profile.avatar_url || defaultAvatar(profile.nickname))}" alt="">
         </a>
 
         <button id="logout-btn" class="nav-label" style="padding: 6px 10px; font-size:12px;">خروج</button>
@@ -82,7 +82,7 @@ export function renderTopnav(profile, activeTab) {
         ` : `
           <form id="new-post-form" class="stack" style="gap:15px; padding-top:15px;">
             <div class="row" style="align-items: flex-start; gap:12px;">
-              <img class="avatar sm ${neonClass(profile.neon_color)}" src="${profile.avatar_url || defaultAvatar(profile.nickname)}">
+              <img class="avatar sm ${neonClass(profile.neon_color)}" src="${escapeHtml(profile.avatar_url || defaultAvatar(profile.nickname))}">
               <textarea name="caption" placeholder="Write a caption..." rows="4" style="border:none; background:transparent; padding:0; resize:none; font-size:15px;" required></textarea>
             </div>
             <div style="border-top: 1px solid var(--glass-border); padding-top:12px;">
@@ -205,6 +205,37 @@ export function attachTopnav(root) {
       const meId = session.session?.user?.id
       if (!meId) return
 
+      // نیک‌نیم خودم برای متن اعلان «فالوت قبول شد»
+      const { data: meRow } = await supabase.from('users').select('nickname').eq('id', meId).single()
+      const myNickname = meRow?.nickname || 'یکی از کاربران'
+
+      // قبول/رد درخواست فالو از داخل دراپ‌داون اعلان‌ها
+      async function answerFollowRequest(senderId, notifId, accept) {
+        try {
+          if (accept) {
+            const { error } = await supabase
+              .from('follows')
+              .update({ status: 'accepted' })
+              .match({ follower_id: senderId, following_id: meId })
+            if (error) throw error
+            await supabase.from('notifications').insert({
+              user_id: senderId,
+              sender_id: meId,
+              type: 'follow_accept',
+              message: `${myNickname} درخواست فالوت رو قبول کرد 🎉`
+            })
+            toast('درخواست فالو قبول شد ✅')
+          } else {
+            await supabase.from('follows').delete().match({ follower_id: senderId, following_id: meId })
+            toast('درخواست فالو رد شد')
+          }
+          await supabase.from('notifications').update({ is_read: true }).eq('id', notifId)
+          loadNotifications()
+        } catch (err) {
+          toast(err.message, { error: true })
+        }
+      }
+
       async function loadNotifications() {
         // ممکنه کاربر وسط لود صفحه عوض کنه؛ اگه المان‌ها دیگه توی DOM نیستن، کاری نکن
         if (!document.getElementById('notis-list')) return
@@ -229,14 +260,28 @@ export function attachTopnav(root) {
           notisList.innerHTML = notis.map(n => `
             <div class="row" style="align-items:flex-start; gap:8px; border-bottom:1px solid rgba(255,255,255,0.02); padding-bottom:6px; ${!n.is_read ? 'font-weight:bold; color:var(--neon);' : ''}">
               <a href="#/profile/${n.sender_id}">
-                <img class="avatar sm" src="${n.sender?.avatar_url || defaultAvatar(n.sender?.nickname)}">
+                <img class="avatar sm" src="${escapeHtml(n.sender?.avatar_url || defaultAvatar(n.sender?.nickname))}">
               </a>
               <div style="flex:1;">
                 <div>${escapeHtml(n.message)}</div>
                 <div class="text-dim" style="font-size:10px;">${new Date(n.created_at).toLocaleTimeString('fa-IR')}</div>
+                ${n.type === 'follow_request' ? `
+                  <div class="row" style="gap:6px; margin-top:5px;">
+                    <button class="follow-accept-btn" data-sender="${n.sender_id}" data-notif="${n.id}" style="padding:3px 10px; font-size:11px;">✓ قبول</button>
+                    <button class="follow-decline-btn danger" data-sender="${n.sender_id}" data-notif="${n.id}" style="padding:3px 10px; font-size:11px;">✕ رد</button>
+                  </div>
+                ` : ''}
               </div>
             </div>
           `).join('')
+
+          // دکمه‌های قبول/رد درخواست فالو (باگ QA: هیچ راه UI برای قبول وجود نداشت)
+          notisList.querySelectorAll('.follow-accept-btn, .follow-decline-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation()
+              answerFollowRequest(btn.dataset.sender, btn.dataset.notif, btn.classList.contains('follow-accept-btn'))
+            })
+          })
         } else {
           notiBadge.style.display = 'none'
           notisList.innerHTML = '<div class="text-dim" style="text-align:center; padding:10px;">هیچ اعلانی نیست</div>'

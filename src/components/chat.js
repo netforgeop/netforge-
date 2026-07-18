@@ -125,6 +125,8 @@ export async function mountChat(app, { targetType, targetId, me }) {
       // خطای RLS برای کاربر میوت‌شده رو فارسی و قابل‌فهم نشون بده
       if (me.activeSanction) {
         toast('به خاطر محدودیت فعال نمی‌توانید پیام بفرستید.', { error: true })
+      } else if (String(error.message || '').includes('row-level security')) {
+        toast('فقط اعضا می‌تونن پیام بفرستن 👀', { error: true })
       } else {
         toast(error.message, { error: true })
       }

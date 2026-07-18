@@ -1,16 +1,18 @@
 -- ====================================================================
--- NetForge — ابزارهای مدیریت (Ban / Mute / Timeout) + حذف محتوا
--- این فایل idempotent است؛ یعنی اگر چند بار اجرا شود، خطا نمی‌دهد.
--- کافی است کل فایل را در Supabase → SQL Editor کپی و Run کنید.
+-- NetForge — ابزارهای مدیریت (Ban / Mute / Timeout) + حذف محتوا + دعوت‌نامه
+-- نسخه ۳ — «خود-ترمیم‌کننده» برای جداول قدیمی user_sanctions
+--
+-- این اسکریپت روی هر دو حالت درست کار می‌کند:
+--   · جدول user_sanctions وجود نداشته باشد → با اسکیمای کامل ساخته می‌شود
+--   · از قبل (با ساختار متفاوت) وجود داشته باشد → فقط ستون‌های گم‌شده
+--     اضافه می‌شوند و هیچ داده‌ای پاک یا بازنویسی نمی‌شود
+--   · ایدempotent است؛ هر چند بار که اجرا شود خطا نمی‌دهد
+--
+-- روش اجرا: کل فایل را در Supabase → SQL Editor کپی و Run کنید.
 -- ====================================================================
 
 -- --------------------------------------------------------------------
--- ۱) جدول محدودیت‌های کاربران (user_sanctions)
---    هر سطر یعنی یک محدودیت روی یک کاربر:
---      type = 'ban'     → مسدود کامل (هیچ محتوایی نمی‌بیند و نمی‌تواند کاری بکند)
---      type = 'mute'    → نمی‌تواند پست/کامنت/پیام بفرستد (دائم یا تا رفع دستی)
---      type = 'timeout' → مثل میوت ولی معمولاً کوتاه‌مدت و خودبه‌خود منقضی می‌شود
---    expires_at = NULL یعنی «دائم/تا رفع دستی»
+-- مرحله ۱) ساخت جدول در صورت نبودن (روی جدول قدیمی بی‌اثر است)
 -- --------------------------------------------------------------------
 create table if not exists public.user_sanctions (
     id uuid default gen_random_uuid() primary key,
@@ -25,10 +27,88 @@ create table if not exists public.user_sanctions (
     is_active boolean default true not null
 );
 
-alter table public.user_sanctions enable row level security;
+-- --------------------------------------------------------------------
+-- مرحله ۲) ترمیم جدولِ از قبل موجود — افزودن هر ستون گم‌شده
+-- (راه‌حل خطای 42703: column s.is_active does not exist)
+-- --------------------------------------------------------------------
+alter table public.user_sanctions add column if not exists id uuid default gen_random_uuid();
+alter table public.user_sanctions add column if not exists user_id uuid;
+alter table public.user_sanctions add column if not exists type text;
+alter table public.user_sanctions add column if not exists reason text;
+alter table public.user_sanctions add column if not exists created_by uuid;
+alter table public.user_sanctions add column if not exists created_at timestamp with time zone default timezone('utc'::text, now());
+alter table public.user_sanctions add column if not exists expires_at timestamp with time zone;
+alter table public.user_sanctions add column if not exists lifted_at timestamp with time zone;
+alter table public.user_sanctions add column if not exists lifted_by uuid;
+alter table public.user_sanctions add column if not exists is_active boolean;
+
+-- رکوردهایی که id ندارند (به‌ندرت) شناسه بگیرند
+update public.user_sanctions set id = gen_random_uuid() where id is null;
+
+-- پیش‌فرض‌های منطقی برای رکوردهای آینده
+alter table public.user_sanctions alter column is_active set default true;
+alter table public.user_sanctions alter column created_at set default timezone('utc'::text, now());
+
+-- نکته مهم: رکوردهای قدیمی با is_active = NULL به‌صورت طبیعی «غیرفعال»
+-- در نظر گرفته می‌شوند (تابع has_active_sanction فقط true را قبول دارد)،
+-- پس عمداً آن‌ها را true نمی‌کنیم تا محدودیتِ منقضی‌شده‌ی احتمالی زنده نشود.
 
 -- --------------------------------------------------------------------
--- ۲) توابع کمکی امن (security definer تا با RLS جدول users تداخل نکنند)
+-- مرحله ۳) اگر ستون type از نوع enum است، هر سه مقدار را داشته باشد
+-- --------------------------------------------------------------------
+do $$
+declare
+  v_enum_name text;
+  v_val text;
+begin
+  select t.typname into v_enum_name
+  from pg_attribute a
+  join pg_class c on c.oid = a.attrelid
+  join pg_namespace n on n.oid = c.relnamespace
+  join pg_type t on t.oid = a.atttypid
+  where c.relname = 'user_sanctions' and n.nspname = 'public'
+    and a.attname = 'type' and t.typtype = 'e'
+    and a.attnum > 0 and not a.attisdropped;
+
+  if v_enum_name is not null then
+    foreach v_val in array array['ban', 'mute', 'timeout'] loop
+      execute format('alter type public.%I add value if not exists %L', v_enum_name, v_val);
+    end loop;
+  end if;
+end $$;
+
+-- --------------------------------------------------------------------
+-- مرحله ۴) چک‌کانسترینت‌های قدیمیِ مربوط به ستون type که ممکن است مقدار
+-- 'timeout' را نپذیرند حذف و جایشان یک چک سازگار (NOT VALID) گذاشته می‌شود
+-- --------------------------------------------------------------------
+do $$
+declare
+  v_con record;
+begin
+  for v_con in
+    select con.conname as name, pg_get_constraintdef(con.oid) as def
+    from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where c.relname = 'user_sanctions' and n.nspname = 'public' and con.contype = 'c'
+  loop
+    if v_con.def ilike '%type%' then
+      execute format('alter table public.user_sanctions drop constraint %I', v_con.name);
+    end if;
+  end loop;
+
+  begin
+    alter table public.user_sanctions
+      add constraint user_sanctions_type_values
+      check (type::text in ('ban', 'mute', 'timeout')) not valid;
+  exception when duplicate_object then null;
+  end;
+end $$;
+
+-- --------------------------------------------------------------------
+-- مرحله ۵) توابع کمکی امن (security definer تا با RLS تداخل نکنند)
+-- مهم: این بخش باید «قبل» از پالیسی‌ها بیاید چون پالیسی‌ها به این
+-- توابع ارجاع می‌دهند.
 -- --------------------------------------------------------------------
 create or replace function public.is_admin()
 returns boolean
@@ -53,6 +133,7 @@ as $$
 $$;
 
 -- آیا کاربر محدودیت فعال از نوع‌های داده‌شده دارد؟
+-- type::text می‌کنیم تا هم روی ستون text و هم enum درست کار کند
 create or replace function public.has_active_sanction(p_user_id uuid, p_types text[])
 returns boolean
 language sql stable security definer
@@ -62,23 +143,33 @@ as $$
     select 1 from public.user_sanctions s
     where s.user_id = p_user_id
       and s.is_active
-      and s.type = any(p_types)
+      and s.type::text = any(p_types)
       and (s.expires_at is null or s.expires_at > now())
   );
 $$;
 
 -- --------------------------------------------------------------------
--- ۳) پالیسی‌های RLS جدول user_sanctions
---    - هر کاربر فقط محدودیت‌های خودش را می‌بیند (برای نمایش پیام بن/میوت)
---    - ادمین/ناظم همه را می‌بیند، ایجاد و رفع می‌کند
---    - ادمین‌ها را نمی‌توان محدود کرد؛ ناظم فقط member را محدود می‌کند
+-- مرحله ۶) فعال‌سازی RLS و بازسازی تمیز پالیسی‌های جدول user_sanctions
+-- (پالیسی‌های قدیمی احتمالی همگی حذف و نسخه‌ی درست جایگزین می‌شود)
 -- --------------------------------------------------------------------
-drop policy if exists "sanctions_select_own_or_staff" on public.user_sanctions;
+alter table public.user_sanctions enable row level security;
+
+do $$
+declare
+  p record;
+begin
+  for p in
+    select policyname from pg_policies
+    where schemaname = 'public' and tablename = 'user_sanctions'
+  loop
+    execute format('drop policy if exists %I on public.user_sanctions', p.policyname);
+  end loop;
+end $$;
+
 create policy "sanctions_select_own_or_staff" on public.user_sanctions
 for select to authenticated
 using (user_id = auth.uid() or public.is_moderator_or_admin());
 
-drop policy if exists "sanctions_insert_staff" on public.user_sanctions;
 create policy "sanctions_insert_staff" on public.user_sanctions
 for insert to authenticated
 with check (
@@ -86,27 +177,25 @@ with check (
     and public.is_moderator_or_admin()
     -- هدف نباید ادمین باشد
     and not exists (select 1 from public.users u where u.id = user_id and u.role = 'admin')
-    -- ناظم‌ها فقط member را محدود کنند؛ ادمین می‌تواند ناظم را هم محدود کند
+    -- ناظم فقط member را محدود می‌کند؛ ادمین می‌تواند ناظم را هم محدود کند
     and (public.is_admin() or not exists (select 1 from public.users u where u.id = user_id and u.role = 'moderator'))
 );
 
-drop policy if exists "sanctions_update_staff" on public.user_sanctions;
 create policy "sanctions_update_staff" on public.user_sanctions
 for update to authenticated
 using (public.is_moderator_or_admin())
 with check (public.is_moderator_or_admin());
 
--- ایندکس برای سرعت چک محدودیت‌ها
 create index if not exists user_sanctions_user_active_idx
     on public.user_sanctions (user_id, is_active);
 
 -- --------------------------------------------------------------------
--- ۴) اجرای واقعی محدودیت در سطح دیتابیس (Restrictive Policies)
+-- مرحله ۷) اجرای واقعی محدودیت در سطح دیتابیس (Restrictive Policies)
 --    پالیسی‌های RESTRICTIVE با پالیسی‌های فعلی AND می‌شوند؛ یعنی بدون
 --    دست زدن به پالیسی‌های قبلی، این قوانین «علاوه» بر آن‌ها اعمال می‌شوند.
 -- --------------------------------------------------------------------
 
--- ۴-الف) میوت/تایم‌اوت/بن ⇒ ممنوعیت ایجاد محتوا (پست، کامنت، پیام چت)
+-- ۷-الف) میوت/تایم‌اوت/بن ⇒ ممنوعیت ایجاد محتوا (پست، کامنت، پیام چت)
 drop policy if exists "sanction_block_insert_posts" on public.posts;
 create policy "sanction_block_insert_posts" on public.posts
 as restrictive for insert to authenticated
@@ -122,7 +211,7 @@ create policy "sanction_block_insert_messages" on public.messages
 as restrictive for insert to authenticated
 with check (not public.has_active_sanction(auth.uid(), array['mute','timeout','ban']));
 
--- ۴-ب) بن ⇒ ممنوعیت ایجاد هر تعامل دیگر + ممنوعیت دیدن محتوا
+-- ۷-ب) بن ⇒ ممنوعیت ایجاد هر تعامل دیگر + ممنوعیت دیدن محتوا
 drop policy if exists "ban_block_insert_lobby_comments" on public.lobby_comments;
 create policy "ban_block_insert_lobby_comments" on public.lobby_comments
 as restrictive for insert to authenticated
@@ -159,8 +248,7 @@ as restrictive for select to authenticated
 using (not public.has_active_sanction(auth.uid(), array['ban']));
 
 -- --------------------------------------------------------------------
--- ۵) اجازه‌ی حذف محتوا به ادمین/ناظم (حذف پست/کامنت + حذف نرم پیام چت)
---    این پالیسی‌ها permissive هستند و با پالیسی‌های فعلی OR می‌شوند.
+-- مرحله ۸) اجازه‌ی حذف محتوا به ادمین/ناظم (حذف پست/کامنت + حذف نرم پیام)
 -- --------------------------------------------------------------------
 drop policy if exists "posts_delete_staff" on public.posts;
 create policy "posts_delete_staff" on public.posts
@@ -172,7 +260,6 @@ create policy "post_comments_delete_staff_or_own" on public.post_comments
 for delete to authenticated
 using (author_id = auth.uid() or public.is_moderator_or_admin());
 
--- پیام: صاحب پیام یا ادمین/ناظم می‌تواند آپدیت کند (حذف نرم با is_deleted)
 drop policy if exists "messages_update_own_or_staff" on public.messages;
 create policy "messages_update_own_or_staff" on public.messages
 for update to authenticated
@@ -180,9 +267,7 @@ using (sender_id = auth.uid() or public.is_moderator_or_admin())
 with check (sender_id = auth.uid() or public.is_moderator_or_admin());
 
 -- --------------------------------------------------------------------
--- ۶) درخواست کد دعوت توسط کاربران عادی (بخش Invite Requests UI)
---    کاربر می‌تواند برای خودش درخواست ثبت کند و وضعیتش را ببیند؛
---    کد ساخته‌شده توسط ادمین هم فقط برای خودش قابل مشاهده است.
+-- مرحله ۹) درخواست کد دعوت توسط کاربران عادی (بخش Invite Requests UI)
 -- --------------------------------------------------------------------
 drop policy if exists "invite_requests_insert_own" on public.invite_requests;
 create policy "invite_requests_insert_own" on public.invite_requests
@@ -207,5 +292,25 @@ using (
 );
 
 -- --------------------------------------------------------------------
--- پایان ✅ اگر همه‌ی خطوط بدون خطا اجرا شد، بک‌اند آماده است.
+-- مرحله ۱۰) گزارش نهایی — ساختار جدول را در تب Messages نشان می‌دهد تا
+-- اگر باز هم چیزی خطا داد، بتوانید عکس/متن آن را برای دیباگ بفرستید.
+-- --------------------------------------------------------------------
+do $$
+declare
+  r record;
+begin
+  raise notice '=== ساختار نهایی جدول user_sanctions ===';
+  for r in
+    select column_name, data_type
+    from information_schema.columns
+    where table_schema = 'public' and table_name = 'user_sanctions'
+    order by ordinal_position
+  loop
+    raise notice '  ستون: %  نوع: %', r.column_name, r.data_type;
+  end loop;
+  raise notice '=== moderation_setup با موفقیت اجرا شد ✅ ===';
+end $$;
+
+-- --------------------------------------------------------------------
+-- پایان ✅
 -- --------------------------------------------------------------------

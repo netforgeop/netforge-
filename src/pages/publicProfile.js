@@ -114,11 +114,13 @@ export default async function publicProfilePage(parts = []) {
       }
     }
 
-    // هماهنگ‌سازی خودکار رنگ بدنه با رنگ نئون انتخابی کاربر
-    const userThemeClass = profile.neon_color === 'red' ? 'theme-red' : profile.neon_color === 'green' ? 'theme-green' : profile.neon_color === 'blue' ? 'theme-blue' : 'theme-rgb'
+    // نکته: رنگِ «کل سایت» (دکمه‌ها و اکسنت‌ها) از انتخابِ خودِ کاربر لاگین‌شده
+    // میاد و روی <body> نشسته می‌شه (در shell.js با applyAccent). پس دیگه کل
+    // کانتینر پروفایل رو با تم طرف رنگ نمی‌کنیم تا با حالت روز/شب قاتی نشه؛
+    // فقط حلقه‌ی نئون دور آواتار رنگِ انتخابیِ صاحب پروفایل رو نشون می‌ده.
 
     const html = `
-      <div class="instagram-profile ${userThemeClass}">
+      <div class="instagram-profile">
         <header class="profile-header">
           <div class="profile-avatar-container">
             <div class="avatar-wrapper ${neonClass(profile.neon_color)}">

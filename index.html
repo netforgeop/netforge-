@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>محفل</title>
     <meta name="description" content="فضای خصوصی دانشجویی — فقط با دعوت" />
+    <script>
+      // اعمال فوری حالت روز/شب «قبل» از رندر صفحه، تا سایت چشمک نزند.
+      // مقدارش رو دکمه‌ی ☀️/🌙 توی نوار کناری (navbar) توی localStorage ذخیره می‌کنه.
+      try {
+        if (localStorage.getItem('nf_mode') === 'light') {
+          document.documentElement.dataset.themeMode = 'light'
+        }
+      } catch (e) { /* localStorage در دسترس نیست */ }
+    </script>
   </head>
   <body>
     <div id="app"></div>

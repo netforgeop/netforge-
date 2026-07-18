@@ -15,7 +15,7 @@
   --text-dim: #94a3b8;   /* slate-400 */
   --text-faint: #64748b; /* slate-500 */
   --danger: #ed4956;
-  --success: #a855f7;
+  --success: #22c55e;
 
   /* رنگ اصلی برند: گرادیان بنفش→صورتی فایل مرجع */
   --neon: #a855f7;
@@ -34,87 +34,97 @@
 }
 
 /* =====================================================================
-   پالت‌های رنگی درخواستی کاربر برای اکانت‌های مختلف با پالت‌های ۴ رنگی
+   سیستم رنگ‌بندی کاربر (از انتخابِ «رنگ نئون» توی پروفایل)
+   ─────────────────────────────────────────────────────────────────────
+   · کلاس‌های accent-* روی <body> نشسته می‌شن (src/lib/appearance.js) و
+     رنگ اصلیِ همه‌ی چیزهای رنگی — دکمه‌های primary، تب فعال سایدبار، بج
+     Admin، حباب چت خودم، لوگوی N و... — رو تعیین می‌کنن.
+   · پس‌زمینه و متن (روز/شب) جدا از این سیستمه و با data-theme-mode کار می‌کنه.
    ===================================================================== */
 
-/* ۱. تم آبی (Blue Theme): 293681 -> 4274D9 -> 95CCDD -> D0E7E6 */
-.theme-blue, .neon-blue {
-  --bg: #293681;      /* تیره عمیق سرمه‌ای */
-  --bg-soft: #4274D9; /* آبی ملایم‌تر */
-  --neon: #95CCDD;    /* آبی آسمانی روشن */
-  --text: #D0E7E6;    /* سفید یخی مایل به آبی */
-  --text-dim: #95CCDD;
-  --glass: rgba(41, 54, 129, 0.4);
-  --glass-strong: rgba(66, 116, 217, 0.5);
-  --glass-border: rgba(149, 204, 221, 0.3);
-  --neon-soft: rgba(149, 204, 221, 0.4);
+/* ثبت متغیرها به‌عنوان «رنگ»، تا مرورگر بتونه توی تم RGB بین مقدارها
+   «نرم و تدریجی» حرکت کنه (بدون این ثبت، رنگ‌ها می‌پرن). */
+@property --grad-a { syntax: '<color>'; inherits: true; initial-value: #9333ea; }
+@property --grad-b { syntax: '<color>'; inherits: true; initial-value: #ec4899; }
+@property --neon   { syntax: '<color>'; inherits: true; initial-value: #a855f7; }
+@property --neon-soft { syntax: '<color>'; inherits: true; initial-value: rgba(168, 85, 247, 0.25); }
+
+/* ── ۱. اکسنت آبی (از پالت: 293681 ← 4274D9 ← 95CCDD ← D0E7E6) ── */
+body.accent-blue {
+  --grad-a: #293681;
+  --grad-b: #4274D9;
+  --gradient-hover: linear-gradient(135deg, #1e2764, #3562b5);
+  --neon: #4274D9;
+  --neon-soft: rgba(66, 116, 217, 0.28);
 }
 
-/* ۲. تم سبز (Green Theme): 091413 -> 285A48 -> 408A71 -> B0E4CC */
-.theme-green, .neon-green {
-  --bg: #091413;      /* سبز جنگلی بسیار تیره */
-  --bg-soft: #285A48; /* سبز تیره زیتونی */
-  --neon: #408A71;    /* سبز فیروزه‌ای خوش‌رنگ */
-  --text: #B0E4CC;    /* سبز نعنایی بسیار روشن */
-  --text-dim: #408A71;
-  --glass: rgba(9, 20, 19, 0.4);
-  --glass-strong: rgba(40, 90, 72, 0.5);
-  --glass-border: rgba(64, 138, 113, 0.3);
-  --neon-soft: rgba(64, 138, 113, 0.4);
+/* ── ۲. اکسنت سبز (از پالت: 091413 ← 285A48 ← 408A71 ← B0E4CC) ── */
+body.accent-green {
+  --grad-a: #285A48;
+  --grad-b: #408A71;
+  --gradient-hover: linear-gradient(135deg, #1d4436, #34735c);
+  --neon: #408A71;
+  --neon-soft: rgba(64, 138, 113, 0.3);
 }
 
-/* ۳. تم قرمز (Red Theme): 1D1616 -> 8E1616 -> D84040 -> EEEEEE */
-.theme-red, .neon-red {
-  --bg: #1D1616;      /* قرمز مشکی تیره لوکس */
-  --bg-soft: #8E1616; /* قرمز یاقوتی تیره */
-  --neon: #D84040;    /* قرمز آتشی جذاب */
-  --text: #EEEEEE;    /* سفید بسیار تمیز */
-  --text-dim: #D84040;
-  --glass: rgba(29, 22, 22, 0.4);
-  --glass-strong: rgba(142, 22, 22, 0.5);
-  --glass-border: rgba(216, 64, 64, 0.3);
-  --neon-soft: rgba(216, 64, 64, 0.4);
+/* ── ۳. اکسنت قرمز (از پالت: 1D1616 ← 8E1616 ← D84040 ← EEEEEE) ── */
+body.accent-red {
+  --grad-a: #8E1616;
+  --grad-b: #D84040;
+  --gradient-hover: linear-gradient(135deg, #701010, #b83232);
+  --neon: #D84040;
+  --neon-soft: rgba(216, 64, 64, 0.28);
 }
 
-/* ۴. تم افکت متحرک رنگین‌کمانی (RGB Cycle) */
-.theme-rgb, .neon-rgb-cycle, .neon-rgb {
-  animation: neon-cycle 8s linear infinite;
-  --glass: rgba(20, 20, 25, 0.4);
+/* ── ۴. اکسنت RGB: رنگ‌ها «به‌آرامی و پیوسته» بین رنگین‌کمان می‌چرخن ──
+   رنگ‌های چرخه طوری انتخاب شدن که هم روی پس‌زمینه‌ی تیره هم روشن
+   خوانا بمونن (سطح ۶۰۰ پالت Tailwind). */
+body.accent-rgb {
+  --gradient-hover: var(--gradient);
+  animation: rgb-accent-cycle 9s linear infinite;
 }
 
-@keyframes neon-cycle {
-  0%   { 
-    --bg: #1c0a21; /* بنفش تیره */
-    --bg-soft: #4a154b; 
-    --neon: #e01e5a; 
-    --text: #fec2d6;
-    --neon-soft: rgba(224, 30, 90, 0.3);
-    --glass-border: rgba(224, 30, 90, 0.2);
-  }
-  33%  { 
-    --bg: #021a1e; /* آبی فیروزه‌ای تیره */
-    --bg-soft: #005a70; 
-    --neon: #2ec4b6; 
-    --text: #cbf3f0;
-    --neon-soft: rgba(46, 196, 182, 0.3);
-    --glass-border: rgba(46, 196, 182, 0.2);
-  }
-  66%  { 
-    --bg: #1e130c; /* نارنجی زرد تیره */
-    --bg-soft: #5e3023; 
-    --neon: #f77f00; 
-    --text: #eae2b7;
-    --neon-soft: rgba(247, 127, 0, 0.3);
-    --glass-border: rgba(247, 127, 0, 0.2);
-  }
-  100% { 
-    --bg: #1c0a21; 
-    --bg-soft: #4a154b; 
-    --neon: #e01e5a; 
-    --text: #fec2d6;
-    --neon-soft: rgba(224, 30, 90, 0.3);
-    --glass-border: rgba(224, 30, 90, 0.2);
-  }
+@keyframes rgb-accent-cycle {
+  0%   { --grad-a: #db2777; --grad-b: #ea580c; --neon: #db2777; --neon-soft: rgba(219, 39, 119, 0.3); }
+  25%  { --grad-a: #ea580c; --grad-b: #d97706; --neon: #ea580c; --neon-soft: rgba(234, 88, 12, 0.3); }
+  50%  { --grad-a: #0d9488; --grad-b: #2563eb; --neon: #0d9488; --neon-soft: rgba(13, 148, 136, 0.3); }
+  75%  { --grad-a: #7c3aed; --grad-b: #db2777; --neon: #7c3aed; --neon-soft: rgba(124, 58, 237, 0.3); }
+  100% { --grad-a: #db2777; --grad-b: #ea580c; --neon: #db2777; --neon-soft: rgba(219, 39, 119, 0.3); }
+}
+
+/* ── کلاس‌های neon-* برای المان‌های جدا (مثل حلقه‌ی دور آواتار هر کاربر):
+   فقط رنگ نئون همون المان رو عوض می‌کنن، نه کل صفحه رو. ── */
+.neon-blue  { --neon: #4274D9; --neon-soft: rgba(66, 116, 217, 0.4); }
+.neon-green { --neon: #408A71; --neon-soft: rgba(64, 138, 113, 0.4); }
+.neon-red   { --neon: #D84040; --neon-soft: rgba(216, 64, 64, 0.4); }
+.neon-rgb   { animation: rgb-accent-cycle 9s linear infinite; }
+
+/* =====================================================================
+   حالت روز (Light Mode) — با data-theme-mode="light" روی <html> فعال می‌شه
+   (دکمه‌ی ☀️/🌙 توی نوار کناری؛ مقدارش توی localStorage ذخیره می‌شه).
+   رنگ اکسنت (accent-*) تو هر دو حالت سر جاشه؛ فقط پس‌زمینه/متن عوض می‌شه.
+   ===================================================================== */
+html[data-theme-mode="light"] {
+  --bg: #eef2f7;
+  --bg-soft: #ffffff;
+  --bg-tertiary: #e2e8f0;
+  --glass: rgba(15, 23, 42, 0.04);
+  --glass-strong: rgba(226, 232, 240, 0.65);
+  --glass-border: rgba(100, 116, 139, 0.28);
+  --text: #0f172a;
+  --text-dim: #475569;
+  --text-faint: #94a3b8;
+  --shadow-glass: 0 4px 18px rgba(15, 23, 42, 0.10);
+}
+
+html[data-theme-mode="light"] input,
+html[data-theme-mode="light"] textarea,
+html[data-theme-mode="light"] select {
+  color-scheme: light;
+}
+
+html[data-theme-mode="light"] .modal-backdrop {
+  background: rgba(15, 23, 42, 0.45);
 }
 
 * { box-sizing: border-box; }
@@ -133,6 +143,12 @@ body {
   font-size: 14px;
   line-height: 1.5;
   direction: rtl;
+}
+
+/* وقتی بین حالت روز/شب سوییچ می‌کنیم، رنگ سطوح اصلی نرم تغییر کنه */
+.topnav, .glass, .modal, .instagram-post-card, .toast,
+.msg .bubble, .badge, input, textarea, select {
+  transition: background-color 0.45s ease, color 0.45s ease, border-color 0.45s ease;
 }
 
 #app {
@@ -246,6 +262,10 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   animation: neon-glow-pulse 2s infinite alternate;
   line-height: 0;
 }
+/* حلقه‌ی RGB: هم پالس نور داره، هم رنگش نرم می‌چرخه (هر دو انیمیشن با هم) */
+.avatar-wrapper.neon-rgb {
+  animation: neon-glow-pulse 2s infinite alternate, rgb-accent-cycle 9s linear infinite;
+}
 
 @keyframes neon-glow-pulse {
   from {
@@ -358,7 +378,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
     background: var(--gradient);
     color: #fff;
     font-weight: 700;
-    box-shadow: 0 4px 14px rgba(147, 51, 234, 0.4);
+    box-shadow: 0 4px 14px var(--neon-soft);
   }
   .topnav .tabs button .nav-icon {
     font-size: 18px;
@@ -578,12 +598,12 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .comment-form-insta button {
   background: transparent;
   border: none;
-  color: #0095f6;
+  color: var(--neon);
   font-weight: 700;
   padding: 0;
 }
 .comment-form-insta button:hover {
-  color: #fff;
+  color: var(--text);
 }
 .delete-post-btn-insta {
   background: transparent;
@@ -615,12 +635,12 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .share-post-btn-insta {
   background: transparent;
   border: none;
-  color: #0095f6;
+  color: var(--neon);
   font-weight: 700;
   font-size: 15px;
 }
 .share-post-btn-insta:hover {
-  color: #fff;
+  color: var(--text);
 }
 
 /* ---------------------------------------------------------------------
@@ -692,7 +712,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   border-radius: 4px;
 }
 .follow-btn.active {
-  background: #0095f6;
+  background: var(--gradient);
+  color: #fff;
   border-color: transparent;
 }
 
@@ -717,8 +738,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   margin-top: -1px;
 }
 .grid-tabs button.active {
-  color: #fff;
-  border-top: 1px solid #fff;
+  color: var(--text);
+  border-top: 1px solid var(--text);
 }
 .instagram-posts-grid {
   display: grid;
@@ -812,7 +833,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   vertical-align: middle;
 }
 .badge.admin { background: var(--gradient); color: #fff; border-color: transparent; }
-.badge.mod { background: rgba(168, 85, 247, 0.2); color: var(--neon); border-color: var(--neon); }
+.badge.mod { background: var(--neon-soft); color: var(--neon); border-color: var(--neon); }
 
 /* ── ابزارهای مدیریت (Ban/Mute/Timeout) ── */
 .moderation-card { border-color: var(--danger); }

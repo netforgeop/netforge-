@@ -1,5 +1,6 @@
 import { neonClass } from '../lib/auth.js'
 import { escapeHtml, toast } from '../lib/utils.js'
+import { getMode, toggleMode } from '../lib/appearance.js'
 
 // رفرنس ماژول-سطح به کانال نوتیفیکیشن؛ مثل چت، قبل از ساخت کانال جدید
 // (با هر ناوبری/رندر مجدد) کانال قبلی رو می‌بندیم تا روی یه topic
@@ -37,6 +38,10 @@ export function renderTopnav(profile, activeTab) {
         `).join('')}
       </div>
       <div class="row user-control-row" style="gap: 12px;">
+        <!-- دکمه تعویض حالت روز/شب — توی حالت شب آیکون خورشید (یعنی کلیک کن بری روز) و برعکس -->
+        <button id="mode-toggle-btn" title="تعویض حالت روز / شب" style="background:transparent; border:none; font-size:17px; padding:4px;">
+          ${getMode() === 'light' ? '🌙' : '☀️'}
+        </button>
         <!-- دکمه زنگوله نوتیفیکیشن‌ها -->
         <button id="noti-bell-btn" style="background:transparent; border:none; font-size:18px; position:relative; padding:4px;">
           🔔
@@ -150,6 +155,14 @@ export function attachTopnav(root) {
       toast(err.message, { error: true })
       submitPostBtn.disabled = false
     }
+  })
+
+  // دکمه تعویض حالت روز/شب
+  const modeBtn = root.querySelector('#mode-toggle-btn')
+  modeBtn?.addEventListener('click', () => {
+    const m = toggleMode()
+    modeBtn.textContent = m === 'light' ? '🌙' : '☀️'
+    toast(m === 'light' ? 'حالت روز فعال شد ☀️' : 'حالت شب فعال شد 🌙')
   })
 
   const logoutBtn = root.querySelector('#logout-btn')

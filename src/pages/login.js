@@ -1,7 +1,12 @@
 import { signUp, logIn, getSession } from '../lib/auth.js'
 import { toast } from '../lib/utils.js'
+import { applyAccent } from '../lib/appearance.js'
 
 export default async function loginPage() {
+  // رنگ اصلی سایت رو به پیش‌فرض (بنفش-صورتی) برگردون؛ بعد از ورود،
+  // shell.js رنگ انتخابی خود کاربر رو اعمال می‌کنه. (حالت روز/شب دست نمی‌خوره)
+  applyAccent(null)
+
   const session = await getSession()
   if (session) {
     window.location.hash = '/feed'

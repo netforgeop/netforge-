@@ -1,6 +1,10 @@
 import './styles/main.css'
 import { initRouter, route, setNotFound } from './lib/router.js'
 import { supabase } from './lib/supabaseClient.js'
+import { initMode } from './lib/appearance.js'
+
+// حالت روز/شب ذخیره‌شده رو همون اول کار اعمال کن (قبل از رندر صفحات)
+initMode()
 
 import loginPage from './pages/login.js'
 import feedPage from './pages/feed.js'

@@ -3,6 +3,7 @@ import { renderTopnav, attachTopnav } from '../components/navbar.js'
 import { showResponsibilityModal } from '../components/responsibilityModal.js'
 import { getMyActiveSanction, sanctionMessage } from './moderation.js'
 import { escapeHtml } from './utils.js'
+import { applyAccent } from './appearance.js'
 
 /**
  * هر صفحه‌ی داخل داشبورد این رو صدا می‌زنه:
@@ -21,6 +22,10 @@ export async function withShell(activeTab, buildContent) {
   if (!profile) {
     return { html: `<div class="container empty-state">پروفایل پیدا نشد. لطفاً دوباره وارد شوید.</div>` }
   }
+
+  // رنگ اصلی سایت (دکمه‌های primary، تب فعال، بج‌ها، حباب چت من) از
+  // رنگ نئونی که کاربر توی پروفایلش انتخاب کرده میاد
+  applyAccent(profile.neon_color)
 
   // چک محدودیت‌های فعال (اگه جدول sanctions هنوز ساخته نشده باشه، null برمی‌گرده و همه‌چیز مثل قبل کار می‌کنه)
   const sanction = await getMyActiveSanction(profile.id)

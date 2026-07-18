@@ -2,7 +2,9 @@ import { withShell } from '../lib/shell.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
-import { escapeHtml, toast } from '../lib/utils.js'
+import { escapeHtml, timeAgo, toast } from '../lib/utils.js'
+import { isStaff, openSanctionModal, getActiveSanctionFor, liftSanction } from '../lib/moderation.js'
+import { reportBlockMarkup, attachReportBlock } from '../components/reportBlock.js'
 
 export default async function publicProfilePage(parts = []) {
   const targetId = parts[0] // آیدی کاربر مورد بازدید
@@ -43,6 +45,75 @@ export default async function publicProfilePage(parts = []) {
       .eq('author_id', profile.id)
       .order('created_at', { ascending: false })
 
+    // ابزار مدیریت: فقط ادمین/ناظم روی پروفایل بقیه می‌بیند
+    // (ناظم حق محدود کردن ادمین/ناظم دیگر را ندارد؛ ادمین همه جز ادمین‌ها)
+    let staffSection = ''
+    if (!isMe && isStaff(myProfile)) {
+      const targetIsStaff = profile.role === 'admin' || profile.role === 'moderator'
+      const canSanction = myProfile.role === 'admin' ? profile.role !== 'admin' : !targetIsStaff
+      if (canSanction) {
+        const activeSanction = await getActiveSanctionFor(profile.id)
+        staffSection = `
+          <div class="glass card moderation-card" style="margin-top:15px;">
+            <h3>⚖️ ابزارهای مدیریت</h3>
+            ${activeSanction ? `
+              <div class="row between">
+                <span>وضعیت فعلی: <span class="badge danger-badge">${activeSanction.type}</span>
+                  ${activeSanction.expires_at ? `تا ${new Date(activeSanction.expires_at).toLocaleString('fa-IR')}` : '(دائم)'}
+                </span>
+                <button class="lift-sanction-btn" data-id="${activeSanction.id}">رفع محدودیت</button>
+              </div>
+            ` : '<p class="text-dim">این کاربر الان محدودیتی ندارد.</p>'}
+            <button class="danger" id="sanction-user-btn" style="margin-top:8px;">⚖️ اعمال محدودیت جدید</button>
+          </div>
+        `
+      }
+    }
+
+    // ── کارت «دعوت دوستان» فقط روی پروفایل خودم نمایش داده می‌شه ──
+    // کاربر درخواست می‌ده، ادمین تایید می‌کنه، کد دعوت همین‌جا ظاهر می‌شه
+    let inviteCard = ''
+    if (isMe) {
+      const { data: myInviteReqs, error: invErr } = await supabase
+        .from('invite_requests')
+        .select('*, resulting_code:invite_codes!invite_requests_resulting_invite_code_id_fkey(code, used_count, max_uses, is_active)')
+        .eq('requested_by', myProfile.id)
+        .order('requested_at', { ascending: false })
+        .limit(5)
+
+      // اگه جدول/پالیسی هنوز آماده نباشه (خطای RLS)، کارت رو نشون نمی‌دیم
+      if (!invErr) {
+        const hasPending = (myInviteReqs || []).some(r => r.status === 'pending')
+        inviteCard = `
+          <div class="glass card" style="margin-top:15px;" dir="rtl">
+            <h3>✉️ دعوت دوستان</h3>
+            <p class="text-dim" style="font-size:13px;">می‌خوای یکی از دوستات به محفل بیاد؟ درخواست کد دعوت بده؛ بعد از تایید ادمین، کد همین‌جا نمایش داده می‌شه.</p>
+            ${hasPending
+              ? '<p class="text-dim">⏳ یک درخواست در انتظار تایید است...</p>'
+              : '<button class="primary" id="request-invite-btn">درخواست کد دعوت جدید</button>'}
+            ${(myInviteReqs || []).filter(r => r.status !== 'pending').length ? `
+              <div class="stack" style="margin-top:12px; gap:8px;">
+                ${(myInviteReqs || []).filter(r => r.status !== 'pending').map(r => `
+                  <div class="row between" style="font-size:13px; border-top:1px solid var(--glass-border); padding-top:8px;">
+                    ${r.status === 'approved' && r.resulting_code ? `
+                      <span>کد شما: <b class="invite-code-text" style="color:var(--neon); font-size:15px; letter-spacing:1px;">${escapeHtml(r.resulting_code.code)}</b>
+                        <span class="text-dim">(${r.resulting_code.used_count}/${r.resulting_code.max_uses} استفاده)</span>
+                      </span>
+                      <button class="copy-invite-btn" data-code="${escapeHtml(r.resulting_code.code)}">📋 کپی</button>
+                    ` : r.status === 'rejected' ? `
+                      <span class="text-dim">❌ درخواست ${timeAgo(r.requested_at)} رد شد</span>
+                    ` : `
+                      <span class="text-dim">در انتظار...</span>
+                    `}
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `
+      }
+    }
+
     // هماهنگ‌سازی خودکار رنگ بدنه با رنگ نئون انتخابی کاربر
     const userThemeClass = profile.neon_color === 'red' ? 'theme-red' : profile.neon_color === 'green' ? 'theme-green' : profile.neon_color === 'blue' ? 'theme-blue' : 'theme-rgb'
 
@@ -66,6 +137,7 @@ export default async function publicProfilePage(parts = []) {
                     ${isFollowing ? 'Following' : isPending ? 'Requested' : 'Follow'}
                   </button>
                   <button class="invite-lobby-btn" id="invite-lobby-btn">Invite to Game</button>
+                  ${reportBlockMarkup(profile.id, { targetType: 'user', targetId: profile.id })}
                 </div>
               `}
             </div>
@@ -83,6 +155,10 @@ export default async function publicProfilePage(parts = []) {
             </div>
           </div>
         </header>
+
+        ${staffSection}
+
+        ${inviteCard}
 
         ${profile.profile_music_url ? `
           <div class="glass card music-card" style="margin-top: 20px;">
@@ -161,11 +237,60 @@ export default async function publicProfilePage(parts = []) {
     return {
       html,
       mount: (app) => {
+        // هندلرهای Report/Block روی پروفایل بقیه
+        attachReportBlock(app, myProfile)
+
+        // ابزارهای مدیریتی: دکمه اعمال محدودیت + رفع محدودیت
+        const sanctionBtn = app.querySelector('#sanction-user-btn')
+        sanctionBtn?.addEventListener('click', () => {
+          openSanctionModal(myProfile, profile, () => window.location.reload())
+        })
+        app.querySelectorAll('.lift-sanction-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            try {
+              await liftSanction(btn.dataset.id, myProfile)
+              toast('محدودیت رفع شد')
+              window.location.reload()
+            } catch (err) { toast(err.message, { error: true }) }
+          })
+        })
+
         if (isMe) {
           const modal = app.querySelector('#edit-profile-modal')
           const openBtn = app.querySelector('#go-edit-btn')
           const closeBtn = app.querySelector('#close-edit-modal')
           const form = app.querySelector('#edit-profile-form')
+
+          // ── دکمه درخواست کد دعوت ──
+          const reqInviteBtn = app.querySelector('#request-invite-btn')
+          reqInviteBtn?.addEventListener('click', async () => {
+            reqInviteBtn.disabled = true
+            try {
+              const { error } = await supabase.from('invite_requests').insert({
+                requested_by: myProfile.id,
+                status: 'pending'
+              })
+              if (error) throw error
+              toast('درخواست کد دعوت ثبت شد؛ بعد از تایید ادمین کد را همین‌جا می‌بینی')
+              window.location.reload()
+            } catch (err) {
+              toast(err.message, { error: true })
+              reqInviteBtn.disabled = false
+            }
+          })
+
+          // ── دکمه‌های کپی کد دعوت ──
+          app.querySelectorAll('.copy-invite-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              try {
+                await navigator.clipboard.writeText(btn.dataset.code)
+                toast('کد دعوت کپی شد! برای دوستت بفرست 📨')
+              } catch {
+                // Fallback برای مرورگرهای قدیمی/بدون دسترسی کلیپ‌بورد
+                prompt('کد را دستی کپی کن:', btn.dataset.code)
+              }
+            })
+          })
 
           openBtn?.addEventListener('click', () => { modal.style.display = 'flex' })
           closeBtn?.addEventListener('click', () => { modal.style.display = 'none' })

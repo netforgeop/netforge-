@@ -1,13 +1,21 @@
 import { neonClass } from '../lib/auth.js'
-import { escapeHtml } from '../lib/utils.js'
+import { escapeHtml, toast } from '../lib/utils.js'
+
+// رفرنس ماژول-سطح به کانال نوتیفیکیشن؛ مثل چت، قبل از ساخت کانال جدید
+// (با هر ناوبری/رندر مجدد) کانال قبلی رو می‌بندیم تا روی یه topic
+// دو بار subscribe نشیم (سوپابیس روی topic تکراری خطا/هشدار می‌ده).
+let notiChannel = null
+// هندلر کلیک روی document برای بستن دراپ‌داون؛ با هر رندر دوباره اضافه نشه
+let docClickHandler = null
 
 export function renderTopnav(profile, activeTab) {
   const tabs = [
-    { key: 'feed', label: 'Home' },
-    { key: 'groups', label: 'Groups' },
-    { key: 'lobbies', label: 'Games' }
+    { key: 'feed', label: 'Home', icon: '🏠' },
+    { key: 'new-post', label: 'New Post', icon: '➕' },
+    { key: 'groups', label: 'Groups', icon: '👥' },
+    { key: 'lobbies', label: 'Games', icon: '🎮' }
   ]
-  if (profile.role === 'admin') tabs.push({ key: 'admin', label: 'Admin Panel' })
+  if (profile.role === 'admin') tabs.push({ key: 'admin', label: 'Admin Panel', icon: '🛡️' })
 
   const roleBadge = profile.role === 'admin'
     ? '<span class="badge admin">Admin</span>'
@@ -19,7 +27,7 @@ export function renderTopnav(profile, activeTab) {
     <!-- سایدبار دسکتاپ سمت چپ (Discord structure) و نوار پایین گوشی (Instagram design) -->
     <div class="topnav">
       <div class="brand">NetForge</div>
-      
+
       <div class="tabs">
         ${tabs.map(t => `
           <button data-tab="${t.key}" class="${t.key === activeTab ? 'active' : ''}">
@@ -28,7 +36,7 @@ export function renderTopnav(profile, activeTab) {
           </button>
         `).join('')}
       </div>
-      <div class="row" style="gap: 12px;">
+      <div class="row user-control-row" style="gap: 12px;">
         <!-- دکمه زنگوله نوتیفیکیشن‌ها -->
         <button id="noti-bell-btn" style="background:transparent; border:none; font-size:18px; position:relative; padding:4px;">
           🔔
@@ -60,32 +68,27 @@ export function renderTopnav(profile, activeTab) {
         <div class="new-post-modal-header row between">
           <button class="close-modal-btn" id="close-post-modal-btn">✕</button>
           <h3>Create New Post</h3>
-          <button class="share-post-btn-insta" id="submit-post-btn">Share</button>
+          ${['mute', 'timeout', 'ban'].includes(profile.activeSanction?.type) ? '<span></span>' : '<button class="share-post-btn-insta" id="submit-post-btn">Share</button>'}
         </div>
-        <form id="new-post-form" class="stack" style="gap:15px; padding-top:15px;">
-          <div class="row" style="align-items: flex-start; gap:12px;">
-            <img class="avatar sm ${neonClass(profile.neon_color)}" src="${profile.avatar_url || defaultAvatar(profile.nickname)}">
-            <textarea name="caption" placeholder="Write a caption..." rows="4" style="border:none; background:transparent; padding:0; resize:none; font-size:15px;" required></textarea>
+        ${['mute', 'timeout', 'ban'].includes(profile.activeSanction?.type) ? `
+          <div class="text-dim" style="text-align:center; padding:24px 8px;">
+            🔇 به خاطر محدودیت فعال نمی‌توانید پست بگذارید.
           </div>
-          <div style="border-top: 1px solid var(--glass-border); padding-top:12px;">
-            <input name="media_url" placeholder="Paste image/video URL here..." style="background:var(--glass-strong); font-size:13px;" />
-          </div>
-          <label class="row" style="font-size:13px; width:auto; cursor:pointer;">
-            <input type="checkbox" name="ratings_enabled" checked style="width:auto; margin:0 5px;" />
-            فعال بودن امتیازدهی ستاره‌ای
-          </label>
-        </form>
-      </div>
-    </div>
-
-    <!-- دراپ‌داون نوتیفیکیشن‌ها -->
-    <div id="noti-dropdown" class="glass" style="display:none; position:absolute; top:65px; left:20px; z-index:100; width:280px; max-height:360px; overflow-y:auto; padding:10px; font-size:13px; box-shadow:var(--shadow-glass);">
-      <div class="row between" style="border-bottom:1px solid var(--glass-border); padding-bottom:6px; margin-bottom:8px;">
-        <b>اعلان‌ها (Notifications)</b>
-        <button id="clear-notis-btn" style="padding:2px 6px; font-size:11px;">خوانده شد</button>
-      </div>
-      <div id="notis-list" class="stack" style="gap:8px;">
-        <div class="text-dim" style="text-align:center; padding:10px;">هیچ اعلانی نیست</div>
+        ` : `
+          <form id="new-post-form" class="stack" style="gap:15px; padding-top:15px;">
+            <div class="row" style="align-items: flex-start; gap:12px;">
+              <img class="avatar sm ${neonClass(profile.neon_color)}" src="${profile.avatar_url || defaultAvatar(profile.nickname)}">
+              <textarea name="caption" placeholder="Write a caption..." rows="4" style="border:none; background:transparent; padding:0; resize:none; font-size:15px;" required></textarea>
+            </div>
+            <div style="border-top: 1px solid var(--glass-border); padding-top:12px;">
+              <input name="media_url" placeholder="Paste image/video URL here..." style="background:var(--glass-strong); font-size:13px;" />
+            </div>
+            <label class="row" style="font-size:13px; width:auto; cursor:pointer;">
+              <input type="checkbox" name="ratings_enabled" checked style="width:auto; margin:0 5px;" />
+              فعال بودن امتیازدهی ستاره‌ای
+            </label>
+          </form>
+        `}
       </div>
     </div>
   `
@@ -114,6 +117,11 @@ export function attachTopnav(root) {
     if (postModal) postModal.style.display = 'none'
   })
 
+  // کلیک روی پس‌زمینه تیره مودال هم اون رو می‌بنده (رفتار استاندارد اینستاگرام)
+  postModal?.addEventListener('click', (e) => {
+    if (e.target === postModal) postModal.style.display = 'none'
+  })
+
   submitPostBtn?.addEventListener('click', async () => {
     if (!postForm) return
     const fd = new FormData(postForm)
@@ -128,7 +136,7 @@ export function attachTopnav(root) {
       const { supabase } = await import('../lib/supabaseClient.js')
       const { data: session } = await supabase.auth.getSession()
       const meId = session.session?.user?.id
-      
+
       const { error } = await supabase.from('posts').insert({
         author_id: meId,
         media_url,
@@ -166,7 +174,16 @@ export function attachTopnav(root) {
       dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none'
     })
 
-    document.addEventListener('click', () => { dropdown.style.display = 'none' })
+    // با هر رندرِ صفحه attachTopnav دوباره صدا زده می‌شه؛ اگه هر بار یه
+    // listener جدید به document اضافه کنیم جمع می‌شن. فقط یه بار ثبت می‌کنیم.
+    if (docClickHandler) {
+      document.removeEventListener('click', docClickHandler)
+    }
+    docClickHandler = () => {
+      const dd = document.getElementById('noti-dropdown')
+      if (dd) dd.style.display = 'none'
+    }
+    document.addEventListener('click', docClickHandler)
     dropdown.addEventListener('click', (e) => e.stopPropagation())
 
     // گرفتن زنده اعلان‌ها از دیتابیس
@@ -176,6 +193,8 @@ export function attachTopnav(root) {
       if (!meId) return
 
       async function loadNotifications() {
+        // ممکنه کاربر وسط لود صفحه عوض کنه؛ اگه المان‌ها دیگه توی DOM نیستن، کاری نکن
+        if (!document.getElementById('notis-list')) return
         const { data: notis } = await supabase
           .from('notifications')
           .select('*, sender:users!notifications_sender_id_fkey(nickname, avatar_url, neon_color)')
@@ -213,8 +232,14 @@ export function attachTopnav(root) {
 
       loadNotifications()
 
+      // بستن کانال قبلی قبل از ساخت کانال جدید (درست مثل کامپوننت چت)
+      if (notiChannel) {
+        supabase.removeChannel(notiChannel)
+        notiChannel = null
+      }
+
       // آپدیت زنده نوتیفیکیشن‌ها با اشتراک Supabase Realtime
-      supabase
+      notiChannel = supabase
         .channel(`notis:${meId}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${meId}` }, () => {
           loadNotifications()

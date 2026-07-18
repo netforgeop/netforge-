@@ -59,7 +59,7 @@ function renderLobby(lobby, me, allComments, allReactions) {
   } else if (isFull) {
     actionBtn = `<button disabled>ظرفیت پره</button>`
   } else {
-    actionBtn = `<button class="join-lobby-btn" data-lobby-id="${lobby.id}">پیوستن</button>`
+    actionBtn = `<button class="join-lobby-btn" data-join-lobby-id="${lobby.id}">پیوستن</button>`
   }
 
   return `
@@ -119,7 +119,7 @@ function mountLobbies(app, me) {
     btn.addEventListener('click', async () => {
       btn.disabled = true
       try {
-        const { error } = await supabase.from('lobby_members').insert({ lobby_id: btn.dataset.lobbyId, user_id: me.id })
+        const { error } = await supabase.from('lobby_members').insert({ lobby_id: btn.dataset.joinLobbyId, user_id: me.id })
         if (error) throw error
         window.location.reload()
       } catch (err) {
@@ -129,7 +129,9 @@ function mountLobbies(app, me) {
     })
   })
 
-  app.querySelectorAll('[data-lobby-id]').forEach(card => {
+  // فقط کارت‌های لابی (نه دکمه‌ی join) — قبلاً هر دو data-lobby-id داشتن
+  // و commentForm روی دکمه null می‌شد و mount با خطا می‌ترکید
+  app.querySelectorAll('.glass.card[data-lobby-id]').forEach(card => {
     const lobbyId = card.dataset.lobbyId
 
     card.querySelectorAll('.lobby-react-btn').forEach(btn => {
@@ -142,7 +144,7 @@ function mountLobbies(app, me) {
     })
 
     const commentForm = card.querySelector('.lobby-comment-form')
-    commentForm.addEventListener('submit', async (e) => {
+    commentForm?.addEventListener('submit', async (e) => {
       e.preventDefault()
       const input = commentForm.querySelector('input')
       const content = input.value.trim()

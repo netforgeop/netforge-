@@ -4,6 +4,7 @@ import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
 import { escapeHtml, timeAgo, toast } from '../lib/utils.js'
 import { reportBlockMarkup, attachReportBlock } from '../components/reportBlock.js'
+import { isStaff, deletePostAsStaff, deleteCommentAsStaff } from '../lib/moderation.js'
 
 const EMOJIS = ['👍', '❤️', '😂', '😮', '🔥']
 
@@ -47,6 +48,8 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
   const myReactions = new Set(postReactions.filter(r => r.user_id === me.id).map(r => r.emoji))
 
   const isMyPost = post.author_id === me.id
+  // ادمین/ناظم می‌تواند هر پستی را حذف کند (دکمه قرمز مخصوص با برچسب مدیریت)
+  const showDelete = isMyPost || isStaff(me)
 
   return `
     <div class="instagram-post-card" data-post-id="${post.id}">
@@ -62,7 +65,7 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
           <span class="time" style="font-size:12px; color:var(--text-dim);">${timeAgo(post.created_at)}</span>
         </div>
         <div class="row" style="gap:8px;">
-          ${isMyPost ? `<button class="delete-post-btn-insta" data-id="${post.id}">حذف</button>` : ''}
+          ${showDelete ? `<button class="delete-post-btn-insta" data-id="${post.id}">${isMyPost ? 'حذف' : '🛡 حذف'}</button>` : ''}
           ${post.author_id !== me.id ? reportBlockMarkup(post.author_id, { targetType: 'post', targetId: post.id }) : ''}
         </div>
       </div>
@@ -110,16 +113,21 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
               <div class="comment-row">
                 <span class="bold-username">${escapeHtml(c.author?.nickname)}</span>
                 <span>${escapeHtml(c.content)}</span>
+                ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-comment-btn" data-id="${c.id}" title="حذف کامنت">✕</button>` : ''}
               </div>
             `).join('')}
           </div>
         ` : ''}
       </div>
 
-      <form class="comment-form-insta row">
-        <input placeholder="Add a comment..." required />
-        <button type="submit">Post</button>
-      </form>
+      ${['mute', 'timeout', 'ban'].includes(me.activeSanction?.type) ? `
+        <div class="text-dim" style="text-align:center; font-size:13px; padding:6px;">🔇 به خاطر محدودیت فعال نمی‌توانید کامنت بگذارید.</div>
+      ` : `
+        <form class="comment-form-insta row">
+          <input placeholder="Add a comment..." required />
+          <button type="submit">Post</button>
+        </form>
+      `}
     </div>
   `
 }
@@ -174,13 +182,24 @@ function mountFeed(app, me) {
     deleteBtn?.addEventListener('click', async () => {
       if (!confirm('آیا از حذف این پست مطمئن هستید؟')) return
       try {
-        const { error } = await supabase.from('posts').delete().eq('id', deleteBtn.dataset.id)
-        if (error) throw error
+        await deletePostAsStaff(deleteBtn.dataset.id)
         toast('پست حذف شد')
         window.location.reload()
       } catch (err) {
         toast(err.message, { error: true })
       }
+    })
+
+    // حذف کامنت: نویسنده‌ی خود کامنت یا ادمین/ناظم
+    card.querySelectorAll('.delete-comment-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('کامنت حذف بشه؟')) return
+        try {
+          await deleteCommentAsStaff(btn.dataset.id)
+          toast('کامنت حذف شد')
+          window.location.reload()
+        } catch (err) { toast(err.message, { error: true }) }
+      })
     })
   })
 }

@@ -27,10 +27,38 @@ $$;
 grant execute on function public.is_admin() to authenticated;
 grant execute on function public.is_moderator_or_admin() to authenticated;
 
--- ───────── ۱) فیکس قطعی enum (نکته: ایندکس partial جلوی تبدیل رو می‌گرفت) ─────────
-drop index if exists public.group_join_requests_one_pending;
-alter table public.group_join_requests alter column status drop default;
-alter table public.group_join_requests alter column status type text using status::text;
+-- ───────── ۱) فیکس قطعی enum ─────────
+-- علت ارور «text = group_join_status»: توی v4 یه CHECK constraint روی status (با نوع enum) ساخته شد
+-- که جلوی تبدیل نوع ستون رو می‌گیره. پس اول هر چی constraint/index وابسته به status هست رو
+-- (با هر اسمی) حذف می‌کنیم، بعد نوع ستون رو عوض می‌کنیم و دوباره همه‌ش رو تمیز می‌سازیم.
+do $gjr$
+declare c record; i record; cur_type text;
+begin
+  -- ۱) همه CHECK constraintهای جدول (حتی اگه اسمشون رو ندونیم)
+  for c in select conname from pg_constraint
+           where conrelid = 'public.group_join_requests'::regclass and contype = 'c' loop
+    execute format('alter table public.group_join_requests drop constraint %I', c.conname);
+    raise notice 'dropped check constraint: %', c.conname;
+  end loop;
+  -- ۲) هر ایندکسی که توی تعریفش به status اشاره شده (مثل ایندکس partial)
+  for i in select indexname from pg_indexes
+           where schemaname = 'public' and tablename = 'group_join_requests'
+             and indexdef ilike '%status%' loop
+    execute format('drop index if exists public.%I', i.indexname);
+    raise notice 'dropped index: %', i.indexname;
+  end loop;
+  -- ۳) پیش‌فرض قدیمی (که enum بود) رو بردار
+  execute 'alter table public.group_join_requests alter column status drop default';
+  -- ۴) حالا که هیچ وابستگی نمونده، نوع رو به text تبدیل کن (اگه هنوز تبدیل نشده)
+  select data_type into cur_type from information_schema.columns
+    where table_schema = 'public' and table_name = 'group_join_requests' and column_name = 'status';
+  if cur_type is distinct from 'text' then
+    execute 'alter table public.group_join_requests alter column status type text using status::text';
+    raise notice 'converted status to text (was %)', cur_type;
+  else
+    raise notice 'status already text - OK';
+  end if;
+end $gjr$;
 alter table public.group_join_requests alter column status set default 'pending';
 update public.group_join_requests set status = 'pending' where status is null;
 alter table public.group_join_requests drop constraint if exists gjr_status_values;

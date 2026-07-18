@@ -2,9 +2,12 @@ import { withShell } from '../lib/shell.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
-import { escapeHtml, timeAgo, toast } from '../lib/utils.js'
+import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
+import { isStaff } from '../lib/moderation.js'
 
 const STATUS_LABEL = { open: 'باز', full: 'پر', closed: 'بسته' }
+const LOBBY_REACTIONS = ['👍', '🔥', '😂']
+const LOBBY_REACTION_ICONS = { '👍': 'thumbs-up', '🔥': 'fire', '😂': 'face-laugh-squint' }
 
 export default async function lobbiesPage() {
   return withShell('lobbies', async (profile) => {
@@ -52,6 +55,7 @@ function renderLobby(lobby, me, allComments, allReactions) {
   const lobbyReactions = allReactions.filter(r => r.lobby_id === lobby.id)
   const reactionCounts = {}
   lobbyReactions.forEach(r => { reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1 })
+  const myReactions = new Set(lobbyReactions.filter(r => r.user_id === me.id).map(r => r.emoji))
 
   let actionBtn
   if (isMember) {
@@ -76,11 +80,20 @@ function renderLobby(lobby, me, allComments, allReactions) {
       </div>
 
       <div class="row" style="margin:10px 0;">
-        ${['👍','🔥','😂'].map(e => `<button class="lobby-react-btn" data-emoji="${e}" style="padding:4px 10px;">${e} ${reactionCounts[e] || ''}</button>`).join('')}
+        ${LOBBY_REACTIONS.map(e => `
+          <button class="lobby-react-btn ${myReactions.has(e) ? 'reacted' : ''}" data-emoji="${e}" style="padding:4px 10px;">
+            ${icon(LOBBY_REACTION_ICONS[e])} ${reactionCounts[e] || ''}
+          </button>
+        `).join('')}
       </div>
 
       <div class="stack" style="font-size:13px;">
-        ${lobbyComments.map(c => `<div><b>${escapeHtml(c.author?.nickname)}</b>: ${escapeHtml(c.content)}</div>`).join('')}
+        ${lobbyComments.map(c => `
+          <div class="row between">
+            <span><b>${escapeHtml(c.author?.nickname)}</b>: ${escapeHtml(c.content)}</span>
+            ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-lobby-comment-btn" data-id="${c.id}" title="حذف کامنت" style="background:transparent;border:none;color:var(--danger);padding:0 6px;font-size:11px;opacity:.55;">${icon('xmark')}</button>` : ''}
+          </div>
+        `).join('')}
       </div>
       <form class="lobby-comment-form row" style="margin-top:8px;">
         <input placeholder="کامنت بذار..." />
@@ -125,7 +138,7 @@ function mountLobbies(app, me) {
       } catch (err) {
         // پیام قابل‌فهم به‌جای خطای خام RLS (ظرفیت پر یا لابی بسته)
         const msg = String(err.message || '')
-        toast(msg.includes('row-level security') ? 'نتوانستی بپیوندی — ظرفیت لابی پر شده یا بسته است 🔒' : msg, { error: true })
+        toast(msg.includes('row-level security') ? 'نتوانستی بپیوندی — ظرفیت لابی پر شده یا بسته است' : msg, { error: true })
         btn.disabled = false
       }
     })
@@ -136,10 +149,30 @@ function mountLobbies(app, me) {
   app.querySelectorAll('.glass.card[data-lobby-id]').forEach(card => {
     const lobbyId = card.dataset.lobbyId
 
+    // ریاکشن لابی: کلیک = ثبت، کلیک مجدد روی همون = برداشتن (تاگل)
     card.querySelectorAll('.lobby-react-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
+        const emoji = btn.dataset.emoji
+        const active = btn.classList.contains('reacted')
         try {
-          await supabase.from('lobby_reactions').insert({ lobby_id: lobbyId, user_id: me.id, emoji: btn.dataset.emoji })
+          if (active) {
+            await supabase.from('lobby_reactions').delete().match({ lobby_id: lobbyId, user_id: me.id, emoji })
+          } else {
+            await supabase.from('lobby_reactions').insert({ lobby_id: lobbyId, user_id: me.id, emoji })
+          }
+          window.location.reload()
+        } catch (err) { toast(err.message, { error: true }) }
+      })
+    })
+
+    // حذف کامنت لابی: نویسنده‌ی خودش یا مدیر
+    card.querySelectorAll('.delete-lobby-comment-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('کامنت حذف بشه؟')) return
+        try {
+          const { error } = await supabase.from('lobby_comments').delete().eq('id', btn.dataset.id)
+          if (error) throw error
+          toast('کامنت حذف شد')
           window.location.reload()
         } catch (err) { toast(err.message, { error: true }) }
       })

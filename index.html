@@ -3,11 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>محفل</title>
-    <meta name="description" content="فضای خصوصی دانشجویی — فقط با دعوت" />
+    <title>NetForge — نت‌فورج</title>
+    <meta name="description" content="نت‌فورج — فضای خصوصی دانشجویی، فقط با دعوت" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <!-- آیکون‌پک Font Awesome (به‌جای ایموجی‌ها در کل رابط کاربری) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script>
       // اعمال فوری حالت روز/شب «قبل» از رندر صفحه، تا سایت چشمک نزند.
-      // مقدارش رو دکمه‌ی ☀️/🌙 توی نوار کناری (navbar) توی localStorage ذخیره می‌کنه.
+      // مقدارش رو دکمه‌ی خورشید/ماه توی نوار کناری (navbar) توی localStorage ذخیره می‌کنه.
       try {
         if (localStorage.getItem('nf_mode') === 'light') {
           document.documentElement.dataset.themeMode = 'light'

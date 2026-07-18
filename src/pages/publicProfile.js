@@ -2,7 +2,7 @@ import { withShell } from '../lib/shell.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
-import { escapeHtml, timeAgo, toast } from '../lib/utils.js'
+import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { isStaff, openSanctionModal, getActiveSanctionFor, liftSanction } from '../lib/moderation.js'
 import { reportBlockMarkup, attachReportBlock } from '../components/reportBlock.js'
 
@@ -55,7 +55,7 @@ export default async function publicProfilePage(parts = []) {
         const activeSanction = await getActiveSanctionFor(profile.id)
         staffSection = `
           <div class="glass card moderation-card" style="margin-top:15px;">
-            <h3>⚖️ ابزارهای مدیریت</h3>
+            <h3>${icon('scale-balanced')} ابزارهای مدیریت</h3>
             ${activeSanction ? `
               <div class="row between">
                 <span>وضعیت فعلی: <span class="badge danger-badge">${activeSanction.type}</span>
@@ -64,10 +64,58 @@ export default async function publicProfilePage(parts = []) {
                 <button class="lift-sanction-btn" data-id="${activeSanction.id}">رفع محدودیت</button>
               </div>
             ` : '<p class="text-dim">این کاربر الان محدودیتی ندارد.</p>'}
-            <button class="danger" id="sanction-user-btn" style="margin-top:8px;">⚖️ اعمال محدودیت جدید</button>
+            <button class="danger" id="sanction-user-btn" style="margin-top:8px;">${icon('scale-balanced')} اعمال محدودیت جدید</button>
           </div>
         `
       }
+    }
+
+    // ── کارت مدیریت کامل حساب: فقط برای ادمین روی پروفایل غیرادمین‌ها ──
+    // ویرایش همه‌چیز پروفایل + تغییر نقش + ریست رمز + تغییر نیک‌نیم (با سینک لاگین)
+    let adminManageSection = ''
+    if (!isMe && myProfile.role === 'admin' && profile.role !== 'admin') {
+      adminManageSection = `
+        <div class="glass card" style="margin-top:15px;">
+          <h3>${icon('user-gear')} مدیریت حساب ${escapeHtml(profile.nickname)}</h3>
+          <p class="text-dim" style="font-size:13px;">ویرایش پروفایل، نقش، و ریست رمز عبور (چون ایمیل واقعی به حساب‌ها وصل نیست، از این‌جا می‌تونی حساب گمشده رو برگردونی).</p>
+          <div class="row" style="gap:8px; margin-top:10px;">
+            <button id="admin-edit-user-btn" class="primary">${icon('pen-to-square')} ویرایش پروفایل کاربر</button>
+          </div>
+        </div>
+
+        <div class="modal-backdrop" id="admin-user-modal" style="display:none;">
+          <div class="glass modal">
+            <div class="row between" style="margin-bottom:15px;">
+              <h3>ویرایش ${escapeHtml(profile.nickname)} (ادمین)</h3>
+              <button class="danger" id="close-admin-user-modal" style="padding:4px 8px;">${icon('xmark')}</button>
+            </div>
+            <form id="admin-user-form" class="stack">
+              <label class="text-dim">نیک‌نیم (لاگین با همین انجام می‌شه)</label>
+              <input name="nickname" value="${escapeHtml(profile.nickname)}" minlength="2" maxlength="24" required />
+
+              <label class="text-dim">نقش</label>
+              <select name="role">
+                <option value="member" ${profile.role === 'member' ? 'selected' : ''}>عضو معمولی</option>
+                <option value="moderator" ${profile.role === 'moderator' ? 'selected' : ''}>ناظم (Moderator)</option>
+              </select>
+
+              <label class="text-dim">لینک آواتار</label>
+              <input name="avatar_url" value="${escapeHtml(profile.avatar_url || '')}" />
+
+              <label class="text-dim">بیو</label>
+              <textarea name="bio" rows="2">${escapeHtml(profile.bio || '')}</textarea>
+
+              <label class="text-dim">استاتوس</label>
+              <input name="status_text" value="${escapeHtml(profile.status_text || '')}" maxlength="80" />
+
+              <label class="text-dim">رمز جدید (خالی بذاری دست نمی‌خوره)</label>
+              <input name="new_password" type="password" minlength="6" placeholder="حداقل ۶ کاراکتر" autocomplete="new-password" />
+
+              <button class="primary" type="submit">${icon('floppy-disk')} ذخیره همه تغییرات</button>
+            </form>
+          </div>
+        </div>
+      `
     }
 
     // ── کارت «دعوت دوستان» فقط روی پروفایل خودم نمایش داده می‌شه ──
@@ -86,11 +134,11 @@ export default async function publicProfilePage(parts = []) {
         const hasPending = (myInviteReqs || []).some(r => r.status === 'pending')
         inviteCard = `
           <div class="glass card" style="margin-top:15px;" dir="rtl">
-            <h3>✉️ دعوت دوستان</h3>
-            <p class="text-dim" style="font-size:13px;">می‌خوای یکی از دوستات به محفل بیاد؟ درخواست کد دعوت بده؛ بعد از تایید ادمین، کد همین‌جا نمایش داده می‌شه.</p>
+            <h3>${icon('envelope')} دعوت دوستان</h3>
+            <p class="text-dim" style="font-size:13px;">می‌خوای یکی از دوستات به نت‌فورج بیاد؟ درخواست کد دعوت بده؛ همون لحظه کد برات ساخته می‌شه (روزی یک کد).</p>
             ${hasPending
-              ? '<p class="text-dim">⏳ یک درخواست در انتظار تایید است...</p>'
-              : '<button class="primary" id="request-invite-btn">درخواست کد دعوت جدید</button>'}
+              ? '<p class="text-dim">درخواست در حال پردازش است...</p>'
+              : `<button class="primary" id="request-invite-btn">${icon('ticket')} درخواست کد دعوت جدید</button>`}
             ${(myInviteReqs || []).filter(r => r.status !== 'pending').length ? `
               <div class="stack" style="margin-top:12px; gap:8px;">
                 ${(myInviteReqs || []).filter(r => r.status !== 'pending').map(r => `
@@ -99,9 +147,9 @@ export default async function publicProfilePage(parts = []) {
                       <span>کد شما: <b class="invite-code-text" style="color:var(--neon); font-size:15px; letter-spacing:1px;">${escapeHtml(r.resulting_code.code)}</b>
                         <span class="text-dim">(${r.resulting_code.used_count}/${r.resulting_code.max_uses} استفاده)</span>
                       </span>
-                      <button class="copy-invite-btn" data-code="${escapeHtml(r.resulting_code.code)}">📋 کپی</button>
+                      <button class="copy-invite-btn" data-code="${escapeHtml(r.resulting_code.code)}">${icon('copy')} کپی</button>
                     ` : r.status === 'rejected' ? `
-                      <span class="text-dim">❌ درخواست ${timeAgo(r.requested_at)} رد شد</span>
+                      <span class="text-dim">${icon('xmark')} درخواست ${timeAgo(r.requested_at)} رد شد</span>
                     ` : `
                       <span class="text-dim">در انتظار...</span>
                     `}
@@ -129,7 +177,7 @@ export default async function publicProfilePage(parts = []) {
       if (pendingFollowers.length) {
         followReqCard = `
           <div class="glass card" style="margin-top:15px;">
-            <h3>👋 درخواست‌های فالو (${pendingFollowers.length})</h3>
+            <h3>${icon('user-plus')} درخواست‌های فالو (${pendingFollowers.length})</h3>
             <div class="stack" style="gap:10px;">
               ${pendingFollowers.map(f => `
                 <div class="row between">
@@ -138,8 +186,8 @@ export default async function publicProfilePage(parts = []) {
                     <b>${escapeHtml(f.follower?.nickname || '')}</b>
                   </a>
                   <div class="row" style="gap:6px;">
-                    <button class="follow-req-accept primary" data-id="${f.id}" style="padding:4px 14px; font-size:12px;">✓ قبول</button>
-                    <button class="follow-req-decline danger" data-id="${f.id}" style="padding:4px 14px; font-size:12px;">✕ رد</button>
+                    <button class="follow-req-accept primary" data-id="${f.id}" style="padding:4px 14px; font-size:12px;">${icon('check')} قبول</button>
+                    <button class="follow-req-decline danger" data-id="${f.id}" style="padding:4px 14px; font-size:12px;">${icon('xmark')} رد</button>
                   </div>
                 </div>
               `).join('')}
@@ -187,12 +235,14 @@ export default async function publicProfilePage(parts = []) {
             <div class="profile-bio-section">
               <span class="profile-real-name">${escapeHtml(profile.nickname)}</span>
               ${profile.bio ? `<p class="profile-bio-text">${escapeHtml(profile.bio)}</p>` : ''}
-              ${profile.status_text ? `<div class="profile-status-bubble">💭 ${escapeHtml(profile.status_text)}</div>` : ''}
+              ${profile.status_text ? `<div class="profile-status-bubble">${icon('comment-dots')} ${escapeHtml(profile.status_text)}</div>` : ''}
             </div>
           </div>
         </header>
 
         ${staffSection}
+
+        ${adminManageSection}
 
         ${followReqCard}
 
@@ -201,7 +251,7 @@ export default async function publicProfilePage(parts = []) {
         ${profile.profile_music_url ? `
           <div class="glass card music-card" style="margin-top: 20px;">
             <div class="row" style="gap:10px;">
-              <span style="font-size:20px;">🎵</span>
+              <span style="font-size:20px;">${icon('music')}</span>
               <div style="flex:1;">
                 <div class="text-dim" style="font-size:11px;">PERSONAL SOUNDTRACK</div>
                 <div style="font-weight:700;">آهنگ شخصی ${escapeHtml(profile.nickname)}</div>
@@ -242,7 +292,7 @@ export default async function publicProfilePage(parts = []) {
           <div class="glass modal">
             <div class="row between" style="margin-bottom:15px;">
               <h3>Edit Profile</h3>
-              <button class="danger" id="close-edit-modal" style="padding:4px 8px;">✕</button>
+              <button class="danger" id="close-edit-modal" style="padding:4px 8px;">${icon('xmark')}</button>
             </div>
             <form id="edit-profile-form" class="stack">
               <label class="text-dim">Avatar Link</label>
@@ -263,10 +313,18 @@ export default async function publicProfilePage(parts = []) {
                 <option value="red" ${profile.neon_color === 'red' ? 'selected' : ''}>قرمز</option>
                 <option value="green" ${profile.neon_color === 'green' ? 'selected' : ''}>سبز</option>
                 <option value="rgb-cycle" ${profile.neon_color === 'rgb-cycle' ? 'selected' : ''}>RGB متحرک</option>
-                <option value="vicecity" ${profile.neon_color === 'vicecity' ? 'selected' : ''}>🌴 Vice City (GTA)</option>
+                <option value="vicecity" ${profile.neon_color === 'vicecity' ? 'selected' : ''}>Vice City (GTA)</option>
               </select>
 
               <button class="primary" type="submit">Save Changes</button>
+            </form>
+
+            <!-- تغییر رمز عبور — چون ایمیل واقعی وصل نیست، فقط از همین‌جا -->
+            <form id="change-password-form" class="stack" style="border-top:1px solid var(--glass-border); padding-top:15px; margin-top:5px;">
+              <label class="text-dim">${icon('key')} تغییر رمز عبور</label>
+              <input name="new_password" type="password" placeholder="رمز جدید (حداقل ۶ کاراکتر)" minlength="6" autocomplete="new-password" required />
+              <input name="confirm_password" type="password" placeholder="تکرار رمز جدید" minlength="6" autocomplete="new-password" required />
+              <button type="submit">${icon('key')} تغییر رمز</button>
             </form>
           </div>
         </div>
@@ -294,6 +352,48 @@ export default async function publicProfilePage(parts = []) {
           })
         })
 
+        // ── مدیریت کامل حساب توسط ادمین (روی پروفایل بقیه) ──
+        const adminModal = app.querySelector('#admin-user-modal')
+        app.querySelector('#admin-edit-user-btn')?.addEventListener('click', () => { adminModal.style.display = 'flex' })
+        app.querySelector('#close-admin-user-modal')?.addEventListener('click', () => { adminModal.style.display = 'none' })
+        adminModal?.addEventListener('click', (e) => { if (e.target === adminModal) adminModal.style.display = 'none' })
+
+        const adminForm = app.querySelector('#admin-user-form')
+        adminForm?.addEventListener('submit', async (e) => {
+          e.preventDefault()
+          const fd = new FormData(adminForm)
+          const btn = adminForm.querySelector('button[type="submit"]')
+          btn.disabled = true
+          try {
+            // ۱) نیک‌نیم (با سینک ایمیل داخلی و متادیتا، وگرنه لاگین می‌شکنه)
+            const newNick = fd.get('nickname')?.trim()
+            if (newNick && newNick !== profile.nickname) {
+              const { error } = await supabase.rpc('admin_update_nickname', { p_user_id: profile.id, p_new_nickname: newNick })
+              if (error) throw error
+            }
+            // ۲) فیلدهای پروفایل و نقش
+            const { error } = await supabase.from('users').update({
+              role: fd.get('role'),
+              avatar_url: fd.get('avatar_url')?.trim() || null,
+              bio: fd.get('bio')?.trim() || null,
+              status_text: fd.get('status_text')?.trim() || null
+            }).eq('id', profile.id)
+            if (error) throw error
+            // ۳) ریست رمز (اختیاری)
+            const newPass = fd.get('new_password')?.trim()
+            if (newPass) {
+              const { error } = await supabase.rpc('admin_reset_password', { p_user_id: profile.id, p_new_password: newPass })
+              if (error) throw error
+              toast('رمز کاربر ریست شد')
+            }
+            toast('پروفایل کاربر بروزرسانی شد')
+            window.location.reload()
+          } catch (err) {
+            toast(err.message, { error: true })
+            btn.disabled = false
+          }
+        })
+
         if (isMe) {
           const modal = app.querySelector('#edit-profile-modal')
           const openBtn = app.querySelector('#go-edit-btn')
@@ -310,7 +410,7 @@ export default async function publicProfilePage(parts = []) {
                 status: 'pending'
               })
               if (error) throw error
-              toast('درخواست کد دعوت ثبت شد؛ بعد از تایید ادمین کد را همین‌جا می‌بینی')
+              toast('کد دعوتت همون لحظه ساخته شد')
               window.location.reload()
             } catch (err) {
               // ایندکس یونیک pending سرور هم جلوی درخواست تکراری رو می‌گیره
@@ -336,10 +436,10 @@ export default async function publicProfilePage(parts = []) {
                       user_id: followerId,
                       sender_id: myProfile.id,
                       type: 'follow_accept',
-                      message: `${myProfile.nickname} درخواست فالوت رو قبول کرد 🎉`
+                      message: `${myProfile.nickname} درخواست فالوت رو قبول کرد`
                     })
                   }
-                  toast('درخواست فالو قبول شد ✅')
+                  toast('درخواست فالو قبول شد')
                 } else {
                   await supabase.from('follows').delete().eq('id', rowId)
                   toast('درخواست فالو رد شد')
@@ -357,7 +457,7 @@ export default async function publicProfilePage(parts = []) {
             btn.addEventListener('click', async () => {
               try {
                 await navigator.clipboard.writeText(btn.dataset.code)
-                toast('کد دعوت کپی شد! برای دوستت بفرست 📨')
+                toast('کد دعوت کپی شد! برای دوستت بفرست')
               } catch {
                 // Fallback برای مرورگرهای قدیمی/بدون دسترسی کلیپ‌بورد
                 prompt('کد را دستی کپی کن:', btn.dataset.code)
@@ -386,6 +486,31 @@ export default async function publicProfilePage(parts = []) {
               toast(err.message, { error: true })
             }
           })
+
+          // ── تغییر رمز عبور (خود کاربر، بدون نیاز به ایمیل) ──
+          const passForm = app.querySelector('#change-password-form')
+          passForm?.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const fd = new FormData(passForm)
+            const newPass = fd.get('new_password')
+            const confirm = fd.get('confirm_password')
+            if (newPass !== confirm) {
+              toast('رمز جدید با تکرارش یکی نیست', { error: true })
+              return
+            }
+            const btn = passForm.querySelector('button')
+            btn.disabled = true
+            try {
+              const { error } = await supabase.auth.updateUser({ password: newPass })
+              if (error) throw error
+              toast('رمز عبور عوض شد')
+              passForm.reset()
+            } catch (err) {
+              toast(err.message, { error: true })
+            } finally {
+              btn.disabled = false
+            }
+          })
         } else {
           // دکمه فالو
           const followBtn = app.querySelector('#follow-action-btn')
@@ -395,14 +520,9 @@ export default async function publicProfilePage(parts = []) {
                 await supabase.from('follows').delete().match({ follower_id: myProfile.id, following_id: profile.id })
                 toast('رابطه فالو لغو شد')
               } else {
-                await supabase.from('follows').insert({ follower_id: myProfile.id, following_id: profile.id, status: 'pending' })
-                await supabase.from('notifications').insert({
-                  user_id: profile.id,
-                  sender_id: myProfile.id,
-                  type: 'follow_request',
-                  message: `${myProfile.nickname} درخواست فالو برای شما فرستاد.`
-                })
-                toast('درخواست فالو ارسال شد')
+                // فالو فوری: بدون تأیید — اعلان new_follower خودش با تریگر دیتابیس ساخته می‌شه
+                await supabase.from('follows').insert({ follower_id: myProfile.id, following_id: profile.id, status: 'accepted' })
+                toast('حالا فالوش می‌کنی')
               }
               window.location.reload()
             } catch (err) {

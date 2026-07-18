@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient.js'
-import { toast } from './utils.js'
+import { toast, icon } from './utils.js'
 
 // آیا کاربر فعلی ادمین یا ناظم است؟
 export function isStaff(profile) {
@@ -112,15 +112,15 @@ export function openSanctionModal(me, targetUser, onDone) {
   wrap.innerHTML = `
     <div class="glass modal" dir="rtl">
       <div class="row between" style="margin-bottom:15px;">
-        <h3>⚖️ محدود کردن ${targetUser.nickname}</h3>
-        <button class="danger" id="sm-close" style="padding:4px 8px;">✕</button>
+        <h3>${icon('scale-balanced')} محدود کردن ${targetUser.nickname}</h3>
+        <button class="danger" id="sm-close" style="padding:4px 8px;">${icon('xmark')}</button>
       </div>
       <div class="stack">
         <label class="text-dim">نوع محدودیت</label>
         <select id="sm-type">
-          <option value="timeout">⏳ تایم‌اوت (موقت، غیرفعال شدن ارسال محتوا)</option>
-          <option value="mute">🔇 میوت (قطع ارسال محتوا تا رفع دستی)</option>
-          <option value="ban">⛔ بن (مسدود شدن کامل حساب)</option>
+          <option value="timeout">تایم‌اوت (موقت، غیرفعال شدن ارسال محتوا)</option>
+          <option value="mute">میوت (قطع ارسال محتوا تا رفع دستی)</option>
+          <option value="ban">بن (مسدود شدن کامل حساب)</option>
         </select>
 
         <label class="text-dim">مدت زمان</label>

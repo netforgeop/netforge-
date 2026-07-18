@@ -1,11 +1,11 @@
 import { supabase } from '../lib/supabaseClient.js'
-import { toast } from '../lib/utils.js'
+import { toast, icon } from '../lib/utils.js'
 
 export function reportBlockMarkup(targetUserId, { targetType = 'user', targetId = targetUserId } = {}) {
   return `
     <div class="row" style="gap:4px;">
-      <button class="report-btn" data-target-type="${targetType}" data-target-id="${targetId}" title="گزارش" style="padding:2px 8px;font-size:12px;">⚑</button>
-      <button class="block-btn" data-user-id="${targetUserId}" title="بلاک" style="padding:2px 8px;font-size:12px;">⛔</button>
+      <button class="report-btn" data-target-type="${targetType}" data-target-id="${targetId}" title="گزارش" style="padding:2px 8px;font-size:12px;">${icon('flag')}</button>
+      <button class="block-btn" data-user-id="${targetUserId}" title="بلاک" style="padding:2px 8px;font-size:12px;">${icon('ban')}</button>
     </div>
   `
 }

@@ -2,7 +2,7 @@ import { requireAuth, getMyProfile } from './auth.js'
 import { renderTopnav, attachTopnav } from '../components/navbar.js'
 import { showResponsibilityModal } from '../components/responsibilityModal.js'
 import { getMyActiveSanction, sanctionMessage } from './moderation.js'
-import { escapeHtml } from './utils.js'
+import { escapeHtml, icon } from './utils.js'
 import { applyAccent } from './appearance.js'
 
 /**
@@ -39,7 +39,7 @@ export async function withShell(activeTab, buildContent) {
     const html = `
       <div class="container" style="max-width:480px; padding-top:80px;">
         <div class="glass" style="padding:32px; text-align:center;">
-          <div style="font-size:48px;">⛔</div>
+          <div style="font-size:48px; color:var(--danger);"><i class="fa-solid fa-ban"></i></div>
           <h2>حساب شما مسدود شده است</h2>
           <p class="text-dim">${escapeHtml(sanctionMessage(sanction))}</p>
           ${sanction.reason ? `<p class="text-dim">دلیل: ${escapeHtml(sanction.reason)}</p>` : ''}
@@ -64,7 +64,7 @@ export async function withShell(activeTab, buildContent) {
   // بنر هشدار برای mute/timeout بالای همه‌ی صفحات
   const muteBanner = sanction
     ? `<div class="glass sanction-banner" style="padding:10px 14px; margin-bottom:14px; border-color:var(--danger);">
-         ⚠️ ${escapeHtml(sanctionMessage(sanction))}
+         ${icon('triangle-exclamation')} ${escapeHtml(sanctionMessage(sanction))}
        </div>`
     : ''
 

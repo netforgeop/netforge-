@@ -662,6 +662,12 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   opacity: 0.55;
 }
 .comment-row .delete-comment-btn:hover { opacity: 1; transform: none; }
+.delete-lobby-comment-btn:hover { opacity: 1 !important; transform: none; }
+.lobby-react-btn.reacted {
+  border-color: var(--neon);
+  color: var(--neon);
+  background: var(--neon-soft);
+}
 .view-all-comments-btn {
   color: var(--text-dim);
   cursor: pointer;
@@ -927,6 +933,16 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .sanction-banner {
   border-right: 4px solid var(--danger);
   font-size: 14px;
+}
+
+/* کاشی لوگوی N صفحه‌ی ورود (هم‌خانواده با favicon و لوگوی سایدبار) */
+.login-logo {
+  width: 44px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 12px;
+  background: var(--gradient);
+  color: #fff; font-size: 22px; font-weight: 900; font-style: italic;
+  line-height: 1;
 }
 
 .spinner {

@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from './navbar.js'
-import { escapeHtml, timeAgo, toast } from '../lib/utils.js'
+import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { isStaff, softDeleteMessage } from '../lib/moderation.js'
 
 // یه رفرنس ماژول-سطح به کانال چت فعال؛ قبل از باز کردن کانال جدید
@@ -15,7 +15,7 @@ export function chatMarkup() {
       <div class="chat-scroll" id="chat-scroll"></div>
       <form id="chat-form" class="chat-input-row">
         <input id="chat-input" placeholder="پیام بنویس... (Enter = ارسال)" autocomplete="off" />
-        <button type="button" id="chat-attach-toggle" title="پیوست" style="padding:6px 10px;">📎</button>
+        <button type="button" id="chat-attach-toggle" title="پیوست" style="padding:6px 10px;">${icon('paperclip')}</button>
         <input id="chat-attachment" placeholder="لینک فایل..." style="max-width:150px; display:none;" />
         <button type="submit" class="primary">ارسال</button>
       </form>
@@ -39,11 +39,16 @@ export async function mountChat(app, { targetType, targetId, me }) {
   // ── اجرای محدودیت در سمت کلاینت: میوت/تایم‌اوت/بن = فرم غیرفعال ──
   // (اجرا در سطح دیتابیس هم با RLS انجام می‌شه؛ این فقط برای UX بهتره)
   if (me.activeSanction && ['mute', 'timeout', 'ban'].includes(me.activeSanction.type)) {
-    form.innerHTML = `<div class="text-dim" style="text-align:center; padding:8px;">🔇 به خاطر محدودیت فعال نمی‌توانید پیام بفرستید.</div>`
+    form.innerHTML = `<div class="text-dim" style="text-align:center; padding:8px;">${icon('volume-xmark')} به خاطر محدودیت فعال نمی‌توانید پیام بفرستید.</div>`
     // لیست پیام‌ها همچنان لود می‌شه تا کاربر بتونه چت رو ببینه (مگر بن باشه که shell جلوش رو می‌گیره)
   }
 
-  // نمایش/پنهان کردن فیلد لینک پیوست با دکمه 📎 (مرتب‌تر، مخصوصاً روی موبایل)
+  // فیلتر بلاک: پیام‌های کسانی که بلاکشون کردم توی چت دیده نمی‌شه
+  const { data: myBlocks } = await supabase
+    .from('user_blocks').select('blocked_id').eq('blocker_id', me.id)
+  const blockedIds = new Set((myBlocks || []).map(b => b.blocked_id))
+
+  // نمایش/پنهان کردن فیلد لینک پیوست با دکمه‌ی گیره (مرتب‌تر، مخصوصاً روی موبایل)
   const attachToggle = app.querySelector('#chat-attach-toggle')
   attachToggle?.addEventListener('click', () => {
     attachmentInput.style.display = attachmentInput.style.display === 'none' ? '' : 'none'
@@ -66,9 +71,10 @@ export async function mountChat(app, { targetType, targetId, me }) {
       .order('created_at', { ascending: true })
       .limit(200)
     if (error) { toast(error.message, { error: true }); return }
-    scrollEl.innerHTML = data.length
-      ? data.map(renderMessage).join('')
-      : `<div class="empty-state" style="padding:30px;">هنوز پیامی نیست. اولین پیام رو تو بفرست 👋</div>`
+    const visible = (data || []).filter(m => !blockedIds.has(m.sender_id))
+    scrollEl.innerHTML = visible.length
+      ? visible.map(renderMessage).join('')
+      : `<div class="empty-state" style="padding:30px;">هنوز پیامی نیست. اولین پیام رو تو بفرست</div>`
     bindDeleteButtons()
     if (wasNearBottom) scrollEl.scrollTop = scrollEl.scrollHeight
   }
@@ -76,7 +82,7 @@ export async function mountChat(app, { targetType, targetId, me }) {
   function renderMessage(m) {
     const u = m.sender || {}
     if (m.is_deleted) {
-      return `<div class="msg deleted"><div class="bubble">🗑 پیام حذف شد</div></div>`
+      return `<div class="msg deleted"><div class="bubble">${icon('trash-can')} پیام حذف شد</div></div>`
     }
     const isMine = m.sender_id === me.id
     // دکمه حذف: فقط برای پیام خودم یا ادمین/ناظم
@@ -87,11 +93,11 @@ export async function mountChat(app, { targetType, targetId, me }) {
         <div class="msg-body">
           <div class="text-dim" style="font-size:12px;">
             ${escapeHtml(u.nickname)} · ${timeAgo(m.created_at)} ${m.is_edited ? '(ویرایش‌شده)' : ''}
-            ${canDelete ? `<button class="msg-delete-btn" data-id="${m.id}" title="حذف پیام">🗑</button>` : ''}
+            ${canDelete ? `<button class="msg-delete-btn" data-id="${m.id}" title="حذف پیام">${icon('trash-can')}</button>` : ''}
           </div>
           <div class="bubble">
             ${m.content ? escapeHtml(m.content) : ''}
-            ${m.attachment_url ? `<div><a href="${escapeHtml(m.attachment_url)}" target="_blank" rel="noopener">📎 پیوست</a></div>` : ''}
+            ${m.attachment_url ? `<div><a href="${escapeHtml(m.attachment_url)}" target="_blank" rel="noopener">${icon('paperclip')} پیوست</a></div>` : ''}
           </div>
         </div>
       </div>
@@ -126,7 +132,7 @@ export async function mountChat(app, { targetType, targetId, me }) {
       if (me.activeSanction) {
         toast('به خاطر محدودیت فعال نمی‌توانید پیام بفرستید.', { error: true })
       } else if (String(error.message || '').includes('row-level security')) {
-        toast('فقط اعضا می‌تونن پیام بفرستن 👀', { error: true })
+        toast('فقط اعضا می‌تونن پیام بفرستن', { error: true })
       } else {
         toast(error.message, { error: true })
       }

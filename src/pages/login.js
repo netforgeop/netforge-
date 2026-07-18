@@ -16,9 +16,12 @@ export default async function loginPage() {
   const html = `
     <div class="container" style="max-width:420px; padding-top:60px;">
       <div class="glass" style="padding:32px;">
-        <h1 style="text-align:center;">محفل</h1>
+        <div style="display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:6px;">
+          <span class="login-logo">N</span>
+          <h1 style="margin:0;">NetForge</h1>
+        </div>
         <p class="text-dim" style="text-align:center; margin-bottom:24px;">
-          یه فضای خصوصی، فقط با دعوت.
+          نت‌فورج — یه فضای خصوصی، فقط با دعوت.
         </p>
 
         <div class="tabs" style="margin-bottom:20px; justify-content:center; flex-wrap:wrap;">

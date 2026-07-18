@@ -1,4 +1,4 @@
-# محفل — فرانت‌اند (Vite + Vanilla JS)
+# NetForge (نت‌فورج) — فرانت‌اند (Vite + Vanilla JS)
 
 ## اجرای لوکال
 

@@ -4,15 +4,13 @@ import { escapeHtml, timeAgo, toast } from '../lib/utils.js'
 
 export default async function groupsPage() {
   return withShell('groups', async (profile) => {
-    const [{ data: groups, error }, { data: myMemberships }, { data: myRequests }] = await Promise.all([
+    const [{ data: groups, error }, { data: myMemberships }] = await Promise.all([
       supabase.from('groups').select('*, group_members(count)').order('created_at', { ascending: false }),
-      supabase.from('group_members').select('group_id').eq('user_id', profile.id),
-      supabase.from('group_join_requests').select('group_id, status').eq('user_id', profile.id)
+      supabase.from('group_members').select('group_id').eq('user_id', profile.id)
     ])
     if (error) throw error
 
     const memberGroupIds = new Set((myMemberships || []).map(m => m.group_id))
-    const pendingGroupIds = new Set((myRequests || []).filter(r => r.status === 'pending').map(r => r.group_id))
 
     const html = `
       <div class="glass card">
@@ -25,7 +23,7 @@ export default async function groupsPage() {
       </div>
 
       <div id="groups-list">
-        ${groups.length ? groups.map(g => renderGroup(g, memberGroupIds, pendingGroupIds)).join('') : `<div class="empty-state">هنوز گروهی ساخته نشده.</div>`}
+        ${groups.length ? groups.map(g => renderGroup(g, memberGroupIds)).join('') : `<div class="empty-state">هنوز گروهی ساخته نشده.</div>`}
       </div>
     `
 
@@ -33,18 +31,16 @@ export default async function groupsPage() {
   })
 }
 
-function renderGroup(g, memberIds, pendingIds) {
+function renderGroup(g, memberIds) {
   const count = g.group_members?.[0]?.count ?? 0
   const isMember = memberIds.has(g.id)
-  const isPending = pendingIds.has(g.id)
 
   let actionBtn
   if (isMember) {
     actionBtn = `<a href="#/groups/${g.id}"><button class="primary">ورود به گروه</button></a>`
-  } else if (isPending) {
-    actionBtn = `<button disabled>در انتظار تأیید</button>`
   } else {
-    actionBtn = `<button class="join-group-btn" data-group-id="${g.id}">درخواست عضویت</button>`
+    // عضویت فوری: بدون تأیید، کلیک کنی همون لحظه عضو می‌شی
+    actionBtn = `<button class="join-group-btn" data-group-id="${g.id}">پیوستن</button>`
   }
 
   return `
@@ -86,11 +82,16 @@ function mountGroups(app, me) {
     btn.addEventListener('click', async () => {
       btn.disabled = true
       try {
-        const { error } = await supabase.from('group_join_requests').insert({
+        // عضویت مستقیم و فوری — دیگر مرحله‌ی تأیید وجود ندارد
+        const { error } = await supabase.from('group_members').insert({
           group_id: btn.dataset.groupId, user_id: me.id
         })
+        if (error && error.code === '23505') {
+          window.location.reload() // از قبل عضو بود
+          return
+        }
         if (error) throw error
-        toast('درخواست عضویت ارسال شد')
+        toast('به گروه پیوستی')
         window.location.reload()
       } catch (err) {
         toast(err.message, { error: true })

@@ -24,3 +24,8 @@ export function toast(message, { error = false, ms = 3200 } = {}) {
 
 export function qs(root, sel) { return root.querySelector(sel) }
 export function qsa(root, sel) { return [...root.querySelectorAll(sel)] }
+
+// آیکون Font Awesome — جایگزین رسمی ایموجی‌ها در کل رابط کاربری
+export function icon(name, cls = '') {
+  return `<i class="fa-solid fa-${name}${cls ? ' ' + cls : ''}"></i>`
+}

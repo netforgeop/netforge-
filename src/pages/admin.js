@@ -1,6 +1,6 @@
 import { withShell } from '../lib/shell.js'
 import { supabase } from '../lib/supabaseClient.js'
-import { escapeHtml, timeAgo, toast } from '../lib/utils.js'
+import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { liftSanction } from '../lib/moderation.js'
 
 export default async function adminPage() {
@@ -73,7 +73,7 @@ export default async function adminPage() {
       </div>
 
       <div class="glass card">
-        <h3>⛔ محدودیت‌های فعال (Ban/Mute/Timeout)</h3>
+        <h3>${icon('ban')} محدودیت‌های فعال (Ban/Mute/Timeout)</h3>
         ${sanctions ? (sanctions.length ? sanctions.map(s => `
           <div class="row between" style="margin-bottom:8px; border-bottom:1px solid var(--glass-border); padding-bottom:8px;">
             <span>
@@ -86,15 +86,16 @@ export default async function adminPage() {
             </span>
             <button class="lift-sanction-btn" data-id="${s.id}">رفع محدودیت</button>
           </div>
-        `).join('') : '<p class="text-dim">هیچ محدودیت فعالی نیست. 🎉</p>')
-        : '<p class="text-dim">⚠️ جدول user_sanctions هنوز ساخته نشده؛ فایل moderation_setup.sql را در Supabase اجرا کنید.</p>'}
+        `).join('') : '<p class="text-dim">هیچ محدودیت فعالی نیست.</p>')
+        : `<p class="text-dim">${icon('triangle-exclamation')} جدول user_sanctions هنوز ساخته نشده؛ فایل moderation_setup.sql را در Supabase اجرا کنید.</p>`}
         <p class="text-dim" style="font-size:12px; margin-top:10px;">
-          برای اعمال محدودیت جدید، به پروفایل کاربر بروید و روی «⚖️ اعمال محدودیت جدید» بزنید.
+          برای اعمال محدودیت جدید، به پروفایل کاربر بروید و روی «${icon('scale-balanced')} اعمال محدودیت جدید» بزنید.
         </p>
       </div>
 
       <div class="glass card">
         <h3>کاربران</h3>
+        <p class="text-dim" style="font-size:12px;">برای ویرایش کامل (نیک‌نیم، نقش، ریست رمز، پروفایل) روی اسم کاربر کلیک کن و از کارت «مدیریت حساب» توی پروفایلش استفاده کن.</p>
         ${(users || []).map(u => `
           <div class="row between" style="margin-bottom:6px;">
             <a href="#/profile/${u.id}" class="row" style="color:inherit;">

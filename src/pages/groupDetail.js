@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
 import { chatMarkup, mountChat } from '../components/chat.js'
-import { escapeHtml, toast } from '../lib/utils.js'
+import { escapeHtml, toast, icon } from '../lib/utils.js'
 
 export default async function groupDetailPage([groupId]) {
   return withShell('groups', async (profile) => {
@@ -67,7 +67,7 @@ export default async function groupDetailPage([groupId]) {
 
       ${(myMembership || isGroupAdmin || isPlatformStaff) ? chatMarkup() : `
         <div class="glass card text-dim" style="text-align:center; padding:24px;">
-          👀 فقط اعضای گروه می‌تونن چت رو ببینن و پیام بفرستن.
+          ${icon('eye-slash')} فقط اعضای گروه می‌تونن چت رو ببینن و پیام بفرستن.
         </div>
       `}
     `

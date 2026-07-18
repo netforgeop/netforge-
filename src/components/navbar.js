@@ -1,6 +1,35 @@
 import { neonClass } from '../lib/auth.js'
-import { escapeHtml, toast } from '../lib/utils.js'
+import { escapeHtml, toast, icon } from '../lib/utils.js'
 import { getMode, toggleMode } from '../lib/appearance.js'
+
+// نقشه‌ی نوع اعلان → آیکون و مقصد کلیک
+const NOTI_ICONS = {
+  follow_request: 'user-plus',
+  follow_accept: 'user-check',
+  new_follower: 'user-plus',
+  new_post: 'image',
+  post_comment: 'comment',
+  post_reaction: 'heart',
+  post_rating: 'star',
+  group_message: 'comments',
+  lobby_message: 'gamepad',
+  lobby_invite: 'gamepad',
+  invite_ready: 'envelope'
+}
+
+function notiLink(n) {
+  switch (n.type) {
+    case 'group_message': return `#/groups/${n.target_id}`
+    case 'lobby_message':
+    case 'lobby_invite': return `#/lobbies/${n.target_id}`
+    case 'new_post':
+    case 'post_comment':
+    case 'post_reaction':
+    case 'post_rating': return '#/feed'
+    case 'invite_ready': return '#/profile'
+    default: return `#/profile/${n.sender_id}`
+  }
+}
 
 // رفرنس ماژول-سطح به کانال نوتیفیکیشن؛ مثل چت، قبل از ساخت کانال جدید
 // (با هر ناوبری/رندر مجدد) کانال قبلی رو می‌بندیم تا روی یه topic
@@ -11,12 +40,12 @@ let docClickHandler = null
 
 export function renderTopnav(profile, activeTab) {
   const tabs = [
-    { key: 'feed', label: 'خانه', icon: '🏠' },
-    { key: 'new-post', label: 'پست جدید', icon: '➕' },
-    { key: 'groups', label: 'گروه‌ها', icon: '👥' },
-    { key: 'lobbies', label: 'بازی‌ها', icon: '🎮' }
+    { key: 'feed', label: 'خانه', icon: 'house' },
+    { key: 'new-post', label: 'پست جدید', icon: 'square-plus' },
+    { key: 'groups', label: 'گروه‌ها', icon: 'users' },
+    { key: 'lobbies', label: 'بازی‌ها', icon: 'gamepad' }
   ]
-  if (profile.role === 'admin') tabs.push({ key: 'admin', label: 'پنل مدیریت', icon: '🛡️' })
+  if (profile.role === 'admin') tabs.push({ key: 'admin', label: 'پنل مدیریت', icon: 'shield-halved' })
 
   const roleBadge = profile.role === 'admin'
     ? '<span class="badge admin">Admin</span>'
@@ -32,7 +61,7 @@ export function renderTopnav(profile, activeTab) {
       <div class="tabs">
         ${tabs.map(t => `
           <button data-tab="${t.key}" class="${t.key === activeTab ? 'active' : ''}">
-            <span class="nav-icon">${t.icon}</span>
+            <span class="nav-icon">${icon(t.icon)}</span>
             <span class="nav-label">${t.label}</span>
           </button>
         `).join('')}
@@ -40,11 +69,11 @@ export function renderTopnav(profile, activeTab) {
       <div class="row user-control-row" style="gap: 12px;">
         <!-- دکمه تعویض حالت روز/شب — توی حالت شب آیکون خورشید (یعنی کلیک کن بری روز) و برعکس -->
         <button id="mode-toggle-btn" title="تعویض حالت روز / شب" style="background:transparent; border:none; font-size:17px; padding:4px;">
-          ${getMode() === 'light' ? '🌙' : '☀️'}
+          ${icon(getMode() === 'light' ? 'moon' : 'sun')}
         </button>
         <!-- دکمه زنگوله نوتیفیکیشن‌ها -->
         <button id="noti-bell-btn" style="background:transparent; border:none; font-size:18px; position:relative; padding:4px;">
-          🔔
+          ${icon('bell')}
           <span id="noti-badge" class="presence-dot online" style="display:none; position:absolute; top:2px; left:2px; width:8px; height:8px; background:var(--danger);"></span>
         </button>
         ${roleBadge}
@@ -52,7 +81,7 @@ export function renderTopnav(profile, activeTab) {
           <img class="avatar sm ${neonClass(profile.neon_color)}" src="${escapeHtml(profile.avatar_url || defaultAvatar(profile.nickname))}" alt="">
         </a>
 
-        <button id="logout-btn" class="nav-label" style="padding: 6px 10px; font-size:12px;">خروج</button>
+        <button id="logout-btn" class="nav-label" style="padding: 6px 10px; font-size:12px;">${icon('right-from-bracket')} خروج</button>
       </div>
     </div>
 
@@ -71,13 +100,13 @@ export function renderTopnav(profile, activeTab) {
     <div id="create-post-modal" class="modal-backdrop" style="display:none;">
       <div class="glass modal instagram-new-post-modal">
         <div class="new-post-modal-header row between">
-          <button class="close-modal-btn" id="close-post-modal-btn">✕</button>
+          <button class="close-modal-btn" id="close-post-modal-btn">${icon('xmark')}</button>
           <h3>Create New Post</h3>
           ${['mute', 'timeout', 'ban'].includes(profile.activeSanction?.type) ? '<span></span>' : '<button class="share-post-btn-insta" id="submit-post-btn">Share</button>'}
         </div>
         ${['mute', 'timeout', 'ban'].includes(profile.activeSanction?.type) ? `
           <div class="text-dim" style="text-align:center; padding:24px 8px;">
-            🔇 به خاطر محدودیت فعال نمی‌توانید پست بگذارید.
+            ${icon('volume-xmark')} به خاطر محدودیت فعال نمی‌توانید پست بگذارید.
           </div>
         ` : `
           <form id="new-post-form" class="stack" style="gap:15px; padding-top:15px;">
@@ -161,8 +190,8 @@ export function attachTopnav(root) {
   const modeBtn = root.querySelector('#mode-toggle-btn')
   modeBtn?.addEventListener('click', () => {
     const m = toggleMode()
-    modeBtn.textContent = m === 'light' ? '🌙' : '☀️'
-    toast(m === 'light' ? 'حالت روز فعال شد ☀️' : 'حالت شب فعال شد 🌙')
+    modeBtn.innerHTML = icon(m === 'light' ? 'moon' : 'sun')
+    toast(m === 'light' ? 'حالت روز فعال شد' : 'حالت شب فعال شد')
   })
 
   const logoutBtn = root.querySelector('#logout-btn')
@@ -222,9 +251,9 @@ export function attachTopnav(root) {
               user_id: senderId,
               sender_id: meId,
               type: 'follow_accept',
-              message: `${myNickname} درخواست فالوت رو قبول کرد 🎉`
+              message: `${myNickname} درخواست فالوت رو قبول کرد`
             })
-            toast('درخواست فالو قبول شد ✅')
+            toast('درخواست فالو قبول شد')
           } else {
             await supabase.from('follows').delete().match({ follower_id: senderId, following_id: meId })
             toast('درخواست فالو رد شد')
@@ -258,22 +287,27 @@ export function attachTopnav(root) {
           localStorage.setItem('noti_count', notis.length.toString())
 
           notisList.innerHTML = notis.map(n => `
-            <div class="row" style="align-items:flex-start; gap:8px; border-bottom:1px solid rgba(255,255,255,0.02); padding-bottom:6px; ${!n.is_read ? 'font-weight:bold; color:var(--neon);' : ''}">
-              <a href="#/profile/${n.sender_id}">
-                <img class="avatar sm" src="${escapeHtml(n.sender?.avatar_url || defaultAvatar(n.sender?.nickname))}">
-              </a>
+            <a href="${notiLink(n)}" class="row noti-item" data-notif-id="${n.id}" style="align-items:flex-start; gap:8px; border-bottom:1px solid rgba(255,255,255,0.02); padding-bottom:6px; color:inherit; text-decoration:none; ${!n.is_read ? 'font-weight:bold; color:var(--neon);' : ''}">
+              <img class="avatar sm" src="${escapeHtml(n.sender?.avatar_url || defaultAvatar(n.sender?.nickname))}">
               <div style="flex:1;">
-                <div>${escapeHtml(n.message)}</div>
+                <div><span style="margin-left:5px; opacity:.8;">${icon(NOTI_ICONS[n.type] || 'bell')}</span>${escapeHtml(n.message)}</div>
                 <div class="text-dim" style="font-size:10px;">${new Date(n.created_at).toLocaleTimeString('fa-IR')}</div>
                 ${n.type === 'follow_request' ? `
                   <div class="row" style="gap:6px; margin-top:5px;">
-                    <button class="follow-accept-btn" data-sender="${n.sender_id}" data-notif="${n.id}" style="padding:3px 10px; font-size:11px;">✓ قبول</button>
-                    <button class="follow-decline-btn danger" data-sender="${n.sender_id}" data-notif="${n.id}" style="padding:3px 10px; font-size:11px;">✕ رد</button>
+                    <button class="follow-accept-btn" data-sender="${n.sender_id}" data-notif="${n.id}" style="padding:3px 10px; font-size:11px;">${icon('check')} قبول</button>
+                    <button class="follow-decline-btn danger" data-sender="${n.sender_id}" data-notif="${n.id}" style="padding:3px 10px; font-size:11px;">${icon('xmark')} رد</button>
                   </div>
                 ` : ''}
               </div>
-            </div>
+            </a>
           `).join('')
+
+          // کلیک روی اعلان: علاوه بر رفتن به مقصد، خوانده‌شده علامت بخوره
+          notisList.querySelectorAll('.noti-item').forEach(item => {
+            item.addEventListener('click', () => {
+              supabase.from('notifications').update({ is_read: true }).eq('id', item.dataset.notifId)
+            })
+          })
 
           // دکمه‌های قبول/رد درخواست فالو (باگ QA: هیچ راه UI برای قبول وجود نداشت)
           notisList.querySelectorAll('.follow-accept-btn, .follow-decline-btn').forEach(btn => {

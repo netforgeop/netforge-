@@ -2,11 +2,19 @@ import { withShell } from '../lib/shell.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
-import { escapeHtml, timeAgo, toast } from '../lib/utils.js'
+import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { reportBlockMarkup, attachReportBlock } from '../components/reportBlock.js'
 import { isStaff, deletePostAsStaff, deleteCommentAsStaff } from '../lib/moderation.js'
 
+// کلید ریاکشن (همون مقدار قدیمی دیتابیسه) → آیکون Font Awesome
 const EMOJIS = ['👍', '❤️', '😂', '😮', '🔥']
+const EMOJI_ICONS = {
+  '👍': 'thumbs-up',
+  '❤️': 'heart',
+  '😂': 'face-laugh-squint',
+  '😮': 'face-surprise',
+  '🔥': 'fire'
+}
 
 export default async function feedPage() {
   return withShell('feed', async (profile) => {
@@ -18,7 +26,13 @@ export default async function feedPage() {
 
     if (error) throw error
 
-    const postIds = posts.map(p => p.id)
+    // فیلتر واقعی بلاک: پست/کامنت کسانی که بلاکشون کردم برام نمایش داده نمی‌شه
+    const { data: myBlocks } = await supabase
+      .from('user_blocks').select('blocked_id').eq('blocker_id', profile.id)
+    const blockedIds = new Set((myBlocks || []).map(b => b.blocked_id))
+
+    const feedPosts = (posts || []).filter(p => !blockedIds.has(p.author_id))
+    const postIds = feedPosts.map(p => p.id)
     const [{ data: ratings }, { data: comments }, { data: reactions }] = await Promise.all([
       postIds.length ? supabase.from('post_ratings').select('post_id, user_id, score').in('post_id', postIds) : { data: [] },
       postIds.length ? supabase.from('post_comments').select('*, author:users!post_comments_author_id_fkey(nickname, avatar_url, neon_color)').in('post_id', postIds).order('created_at') : { data: [] },
@@ -27,7 +41,7 @@ export default async function feedPage() {
 
     const html = `
       <div id="posts-list" class="instagram-feed-container">
-        ${posts.length ? posts.map(p => renderPost(p, profile, ratings, comments, reactions)).join('') : `<div class="empty-state">هنوز پستی نیست. اولین نفر باش.</div>`}
+        ${feedPosts.length ? feedPosts.map(p => renderPost(p, profile, ratings, comments, reactions, blockedIds)).join('') : `<div class="empty-state">هنوز پستی نیست. اولین نفر باش.</div>`}
       </div>
     `
 
@@ -35,12 +49,12 @@ export default async function feedPage() {
   })
 }
 
-function renderPost(post, me, allRatings, allComments, allReactions) {
+function renderPost(post, me, allRatings, allComments, allReactions, blockedIds = new Set()) {
   const author = post.author || {}
   const myRating = allRatings.find(r => r.post_id === post.id && r.user_id === me.id)
   const postRatings = allRatings.filter(r => r.post_id === post.id)
   const avg = postRatings.length ? (postRatings.reduce((s, r) => s + r.score, 0) / postRatings.length).toFixed(1) : null
-  const postComments = allComments.filter(c => c.post_id === post.id)
+  const postComments = allComments.filter(c => c.post_id === post.id && !blockedIds.has(c.author_id))
   const postReactions = allReactions.filter(r => r.post_id === post.id)
 
   const reactionCounts = {}
@@ -65,7 +79,7 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
           <span class="time" style="font-size:12px; color:var(--text-dim);">${timeAgo(post.created_at)}</span>
         </div>
         <div class="row" style="gap:8px;">
-          ${showDelete ? `<button class="delete-post-btn-insta" data-id="${post.id}">${isMyPost ? 'حذف' : '🛡 حذف'}</button>` : ''}
+          ${showDelete ? `<button class="delete-post-btn-insta" data-id="${post.id}">${isMyPost ? 'حذف' : `${icon('shield-halved')} حذف`}</button>` : ''}
           ${post.author_id !== me.id ? reportBlockMarkup(post.author_id, { targetType: 'post', targetId: post.id }) : ''}
         </div>
       </div>
@@ -80,7 +94,7 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
         <div class="row" style="gap:14px;">
           ${EMOJIS.map(e => `
             <span class="insta-emoji-btn ${myReactions.has(e) ? 'active' : ''}" data-emoji="${e}">
-              ${e} <small>${reactionCounts[e] || ''}</small>
+              ${icon(EMOJI_ICONS[e])} <small>${reactionCounts[e] || ''}</small>
             </span>
           `).join('')}
         </div>
@@ -89,7 +103,7 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
           <div class="row insta-stars-container" style="gap:4px;">
             ${[2, 4, 6, 8, 10].map(val => {
               const isActive = (myRating?.score || 0) >= val;
-              return `<span class="insta-star ${isActive ? 'active' : ''}" data-val="${val}">★</span>`;
+              return `<span class="insta-star ${isActive ? 'active' : ''}" data-val="${val}">${icon('star')}</span>`;
             }).join('')}
             <span class="avg-score" style="margin-right:6px; font-size:12px; color:var(--text-dim);">
               ${avg ? `${avg}/10` : 'امتیاز دهید'}
@@ -113,7 +127,7 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
               <div class="comment-row">
                 <span class="bold-username">${escapeHtml(c.author?.nickname)}</span>
                 <span>${escapeHtml(c.content)}</span>
-                ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-comment-btn" data-id="${c.id}" title="حذف کامنت">✕</button>` : ''}
+                ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-comment-btn" data-id="${c.id}" title="حذف کامنت">${icon('xmark')}</button>` : ''}
               </div>
             `).join('')}
           </div>
@@ -121,7 +135,7 @@ function renderPost(post, me, allRatings, allComments, allReactions) {
       </div>
 
       ${['mute', 'timeout', 'ban'].includes(me.activeSanction?.type) ? `
-        <div class="text-dim" style="text-align:center; font-size:13px; padding:6px;">🔇 به خاطر محدودیت فعال نمی‌توانید کامنت بگذارید.</div>
+        <div class="text-dim" style="text-align:center; font-size:13px; padding:6px;">${icon('volume-xmark')} به خاطر محدودیت فعال نمی‌توانید کامنت بگذارید.</div>
       ` : `
         <form class="comment-form-insta row">
           <input placeholder="Add a comment..." required />

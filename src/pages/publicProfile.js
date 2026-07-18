@@ -214,22 +214,22 @@ export default async function publicProfilePage(parts = []) {
             <div class="profile-username-row">
               <h2>${escapeHtml(profile.nickname)}</h2>
               ${isMe ? `
-                <button class="edit-profile-btn" id="go-edit-btn">Edit Profile</button>
+                <button class="edit-profile-btn" id="go-edit-btn">${icon('pen-to-square')} ویرایش پروفایل</button>
               ` : `
                 <div class="row" style="gap: 8px;">
                   <button class="follow-btn ${isFollowing ? 'active' : ''}" id="follow-action-btn">
-                    ${isFollowing ? 'Following' : isPending ? 'Requested' : 'Follow'}
+                    ${isFollowing ? 'فالو می‌کنی' : isPending ? 'درخواست داده‌ای' : 'فالو'}
                   </button>
-                  <button class="invite-lobby-btn" id="invite-lobby-btn">Invite to Game</button>
+                  <button class="invite-lobby-btn" id="invite-lobby-btn">${icon('gamepad')} دعوت به بازی</button>
                   ${reportBlockMarkup(profile.id, { targetType: 'user', targetId: profile.id })}
                 </div>
               `}
             </div>
             
             <div class="profile-stats">
-              <span><b>${userPosts?.length || 0}</b> posts</span>
-              <span><b>${followersCount}</b> followers</span>
-              <span><b>${followingCount}</b> following</span>
+              <span><b>${userPosts?.length || 0}</b> پست</span>
+              <span><b>${followersCount}</b> دنبال‌کننده</span>
+              <span><b>${followingCount}</b> دنبال‌شونده</span>
             </div>
             
             <div class="profile-bio-section">
@@ -253,7 +253,7 @@ export default async function publicProfilePage(parts = []) {
             <div class="row" style="gap:10px;">
               <span style="font-size:20px;">${icon('music')}</span>
               <div style="flex:1;">
-                <div class="text-dim" style="font-size:11px;">PERSONAL SOUNDTRACK</div>
+                <div class="text-dim" style="font-size:11px;">موزیکِ پروفایل</div>
                 <div style="font-weight:700;">آهنگ شخصی ${escapeHtml(profile.nickname)}</div>
               </div>
             </div>
@@ -263,7 +263,7 @@ export default async function publicProfilePage(parts = []) {
 
         <div class="profile-posts-grid-container">
           <div class="grid-tabs">
-            <button class="active">POSTS</button>
+            <button class="active">پست‌ها</button>
           </div>
           
           <div class="instagram-posts-grid">
@@ -279,35 +279,51 @@ export default async function publicProfilePage(parts = []) {
               </div>
             `).join('') : `
               <div class="empty-state" style="grid-column: 1 / -1;">
-                <p>No Posts Yet</p>
+                <p>هنوز پستی نیست</p>
               </div>
             `}
           </div>
         </div>
       </div>
 
+      ${!isMe ? `
+        <!-- مودال دعوت به بازی: یکی از لابی‌هایی که خودم عضو هستم رو انتخاب می‌کنم
+             تا دعوت‌نامه با target_id درست ساخته بشه (فیکس باگ #/lobbies/null) -->
+        <div class="modal-backdrop" id="invite-game-modal" style="display:none;">
+          <div class="glass modal">
+            <div class="row between" style="margin-bottom:15px;">
+              <h3>${icon('gamepad')} دعوت ${escapeHtml(profile.nickname)} به بازی</h3>
+              <button class="danger" id="close-invite-game-modal" style="padding:4px 8px;">${icon('xmark')}</button>
+            </div>
+            <div id="invite-lobbies-list" class="stack" style="gap:4px;">
+              <div class="text-dim" style="text-align:center;">در حال بارگذاری لابی‌هات...</div>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
       <!-- مودال ویرایش فقط برای خود کاربر -->
       ${isMe ? `
         <div class="modal-backdrop" id="edit-profile-modal" style="display:none;">
           <div class="glass modal">
             <div class="row between" style="margin-bottom:15px;">
-              <h3>Edit Profile</h3>
+              <h3>ویرایش پروفایل</h3>
               <button class="danger" id="close-edit-modal" style="padding:4px 8px;">${icon('xmark')}</button>
             </div>
             <form id="edit-profile-form" class="stack">
-              <label class="text-dim">Avatar Link</label>
+              <label class="text-dim">لینک آواتار</label>
               <input name="avatar_url" value="${escapeHtml(profile.avatar_url || '')}" placeholder="لینک عکس پروفایل" />
 
-              <label class="text-dim">Bio</label>
+              <label class="text-dim">بیو</label>
               <textarea name="bio" rows="3" placeholder="چند خط درباره‌ی خودت">${escapeHtml(profile.bio || '')}</textarea>
 
-              <label class="text-dim">Profile Music (Direct MP3 URL)</label>
+              <label class="text-dim">آهنگ پروفایل (لینک مستقیم MP3)</label>
               <input name="profile_music_url" value="${escapeHtml(profile.profile_music_url || '')}" placeholder="لینک مستقیم فایل صوتی" />
 
-              <label class="text-dim">Status/Short Story</label>
+              <label class="text-dim">استاتوس / جمله‌ی کوتاه</label>
               <input name="status_text" value="${escapeHtml(profile.status_text || '')}" maxlength="80" />
 
-              <label class="text-dim">Neon Theme Color</label>
+              <label class="text-dim">رنگ تم (نئون)</label>
               <select name="neon_color">
                 <option value="blue" ${profile.neon_color === 'blue' ? 'selected' : ''}>آبی</option>
                 <option value="red" ${profile.neon_color === 'red' ? 'selected' : ''}>قرمز</option>
@@ -316,7 +332,7 @@ export default async function publicProfilePage(parts = []) {
                 <option value="vicecity" ${profile.neon_color === 'vicecity' ? 'selected' : ''}>Vice City (GTA)</option>
               </select>
 
-              <button class="primary" type="submit">Save Changes</button>
+              <button class="primary" type="submit">${icon('floppy-disk')} ذخیره تغییرات</button>
             </form>
 
             <!-- تغییر رمز عبور — چون ایمیل واقعی وصل نیست، فقط از همین‌جا -->
@@ -530,23 +546,61 @@ export default async function publicProfilePage(parts = []) {
             }
           })
 
-          // دکمه دعوت به بازی
+          // ── دکمه دعوت به بازی: مودال انتخاب لابی (Steam-like)
+          // دعوت‌نامه با target_id = لابی واقعی ساخته می‌شه تا لینک اعلان درست کار کنه
           const inviteBtn = app.querySelector('#invite-lobby-btn')
-          inviteBtn?.addEventListener('click', async () => {
-            const gameName = prompt('اسم بازی که می‌خوای دعوتش کنی رو بنویس:')
-            if (!gameName) return
+          const inviteModal = app.querySelector('#invite-game-modal')
+          const inviteList = app.querySelector('#invite-lobbies-list')
+
+          async function loadMyLobbies() {
             try {
-              await supabase.from('notifications').insert({
-                user_id: profile.id,
-                sender_id: myProfile.id,
-                type: 'lobby_invite',
-                message: `${myProfile.nickname} شما را به بازی ${gameName} دعوت کرده است!`
+              const { data, error } = await supabase
+                .from('lobby_members')
+                .select('lobby_id, lobby:game_lobbies!lobby_members_lobby_id_fkey(id, game_name, status, capacity)')
+                .eq('user_id', myProfile.id)
+              if (error) throw error
+              const lobbies = (data || []).map(r => r.lobby).filter(l => l && l.status !== 'closed')
+              if (!lobbies.length) {
+                inviteList.innerHTML = `<div class="text-dim" style="text-align:center; padding:14px;">عضو هیچ لابی بازی نیستی!<br>اول از صفحه‌ی «بازی‌ها» به یه لابی بپیوند، بعد از اینجا دوستت رو دعوت کن.</div>`
+                return
+              }
+              inviteList.innerHTML = lobbies.map(l => `
+                <div class="invite-user-row">
+                  <b>${escapeHtml(l.game_name)}</b>
+                  <button class="send-lobby-invite-btn primary" data-lobby-id="${l.id}" data-lobby-name="${escapeHtml(l.game_name)}" style="padding:4px 14px; font-size:12px;">${icon('paper-plane')} دعوت</button>
+                </div>
+              `).join('')
+              inviteList.querySelectorAll('.send-lobby-invite-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                  btn.disabled = true
+                  try {
+                    const { error } = await supabase.from('notifications').insert({
+                      user_id: profile.id,
+                      sender_id: myProfile.id,
+                      type: 'lobby_invite',
+                      target_id: btn.dataset.lobbyId,
+                      message: `${myProfile.nickname} تورو به لابی «${btn.dataset.lobbyName}» دعوت کرد — بیا بازی کنیم!`
+                    })
+                    if (error) throw error
+                    btn.innerHTML = `${icon('check')} دعوت شد`
+                    toast('دعوت فرستاده شد!')
+                  } catch (err) {
+                    toast(err.message, { error: true })
+                    btn.disabled = false
+                  }
+                })
               })
-              toast('دعوت با موفقیت ارسال شد!')
             } catch (err) {
-              toast(err.message, { error: true })
+              inviteList.innerHTML = `<div class="text-dim" style="text-align:center;">${escapeHtml(err.message)}</div>`
             }
+          }
+
+          inviteBtn?.addEventListener('click', () => {
+            inviteModal.style.display = 'flex'
+            loadMyLobbies()
           })
+          app.querySelector('#close-invite-game-modal')?.addEventListener('click', () => { inviteModal.style.display = 'none' })
+          inviteModal?.addEventListener('click', (e) => { if (e.target === inviteModal) inviteModal.style.display = 'none' })
         }
 
         app.querySelectorAll('.grid-post-item').forEach(item => {

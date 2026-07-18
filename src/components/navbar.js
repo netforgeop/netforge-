@@ -14,14 +14,26 @@ const NOTI_ICONS = {
   group_message: 'comments',
   lobby_message: 'gamepad',
   lobby_invite: 'gamepad',
-  invite_ready: 'envelope'
+  invite_ready: 'envelope',
+  group_invite: 'users',
+  group_join_request: 'user-plus',
+  group_accepted: 'circle-check',
+  group_rejected: 'circle-xmark'
 }
 
 function notiLink(n) {
   switch (n.type) {
-    case 'group_message': return `#/groups/${n.target_id}`
+    case 'group_message':
+    case 'group_invite':
+    case 'group_join_request':
+    case 'group_accepted':
+    case 'group_rejected':
+      // اگر target تهی بود (اعلان‌های قدیمیِ خراب) لااقل به لیست گروه‌ها بره
+      return n.target_id ? `#/groups/${n.target_id}` : '#/groups'
     case 'lobby_message':
-    case 'lobby_invite': return `#/lobbies/${n.target_id}`
+    case 'lobby_invite':
+      // فیکس باگ QA: دعوت‌نامه‌های قدیمی بدون target_id به #/lobbies/null می‌رفتن
+      return n.target_id ? `#/lobbies/${n.target_id}` : '#/lobbies'
     case 'new_post':
     case 'post_comment':
     case 'post_reaction':
@@ -85,8 +97,8 @@ export function renderTopnav(profile, activeTab) {
       </div>
     </div>
 
-    <!-- دراپ‌داون نوتیفیکیشن‌ها -->
-    <div id="noti-dropdown" class="glass" style="display:none; position:absolute; top:65px; left:20px; z-index:100; width:280px; max-height:360px; overflow-y:auto; padding:10px; font-size:13px; box-shadow:var(--shadow-glass);">
+    <!-- دراپ‌داون نوتیفیکیشن‌ها — ثابت روی صفحه (fixed)؛ موقعیتش با JS کنار زنگوله ست می‌شه -->
+    <div id="noti-dropdown" class="glass" style="display:none; top:65px; left:20px; width:280px; max-height:360px; overflow-y:auto; padding:10px; font-size:13px; box-shadow:var(--shadow-glass);">
       <div class="row between" style="border-bottom:1px solid var(--glass-border); padding-bottom:6px; margin-bottom:8px;">
         <b>اعلان‌ها (Notifications)</b>
         <button id="clear-notis-btn" style="padding:2px 6px; font-size:11px;">خوانده شد</button>
@@ -211,9 +223,34 @@ export function attachTopnav(root) {
   const clearBtn = root.querySelector('#clear-notis-btn')
 
   if (bellBtn && dropdown) {
+    // موقعیت‌دهی دقیق دراپ‌داون کنار زنگوله (fixed = با اسکرول تکون نمی‌خوره)
+    // اگر زنگوله نیمه‌ی بالای صفحه‌ست → دراپ‌داون زیرش باز می‌شه؛
+    // اگر ته صفحه‌ست (سایدبار دسکتاپ) → بالای زنگوله باز می‌شه تا بیرون نره.
+    function positionDropdown() {
+      const rect = bellBtn.getBoundingClientRect()
+      const margin = 10
+      const ddW = 280
+      dropdown.style.top = 'auto'
+      dropdown.style.bottom = 'auto'
+      dropdown.style.left = 'auto'
+      dropdown.style.right = 'auto'
+      // افقی: لبه‌ی راست دراپ‌داون تقریباً تراز با لبه‌ی راست زنگوله، ولی هیچ‌وقت از صفحه بیرون نمی‌زنه
+      let x = window.innerWidth - rect.right - 20
+      x = Math.max(10, Math.min(x, window.innerWidth - ddW - 10))
+      dropdown.style.left = x + 'px'
+      // عمودی
+      if (rect.top < 160) {
+        dropdown.style.top = (rect.bottom + margin) + 'px'
+      } else {
+        dropdown.style.bottom = (window.innerHeight - rect.top + margin) + 'px'
+      }
+    }
+
     bellBtn.addEventListener('click', (e) => {
       e.stopPropagation()
-      dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none'
+      const opening = dropdown.style.display === 'none'
+      if (opening) positionDropdown()
+      dropdown.style.display = opening ? 'block' : 'none'
     })
 
     // با هر رندرِ صفحه attachTopnav دوباره صدا زده می‌شه؛ اگه هر بار یه

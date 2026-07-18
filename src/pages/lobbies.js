@@ -9,6 +9,9 @@ const STATUS_LABEL = { open: 'باز', full: 'پر', closed: 'بسته' }
 const LOBBY_REACTIONS = ['👍', '🔥', '😂']
 const LOBBY_REACTION_ICONS = { '👍': 'thumbs-up', '🔥': 'fire', '😂': 'face-laugh-squint' }
 
+// رفرنس ماژول-سطح به کانال realtime لابی‌ها
+let lobbiesChannel = null
+
 export default async function lobbiesPage() {
   return withShell('lobbies', async (profile) => {
     const { data: lobbies, error } = await supabase
@@ -57,15 +60,6 @@ function renderLobby(lobby, me, allComments, allReactions) {
   lobbyReactions.forEach(r => { reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1 })
   const myReactions = new Set(lobbyReactions.filter(r => r.user_id === me.id).map(r => r.emoji))
 
-  let actionBtn
-  if (isMember) {
-    actionBtn = `<a href="#/lobbies/${lobby.id}"><button class="primary">ورود به چت</button></a>`
-  } else if (isFull) {
-    actionBtn = `<button disabled>ظرفیت پره</button>`
-  } else {
-    actionBtn = `<button class="join-lobby-btn" data-join-lobby-id="${lobby.id}">پیوستن</button>`
-  }
-
   return `
     <div class="glass card" data-lobby-id="${lobby.id}">
       <div class="row between">
@@ -76,24 +70,19 @@ function renderLobby(lobby, me, allComments, allReactions) {
             میزبان: ${escapeHtml(host.nickname)} · ${members.length}/${lobby.capacity} نفر · ${STATUS_LABEL[lobby.status]} · ${timeAgo(lobby.last_activity_at)}
           </span>
         </div>
-        <div>${actionBtn}</div>
+        <div>${lobbyActionBtn(lobby, isMember, isFull)}</div>
       </div>
 
-      <div class="row" style="margin:10px 0;">
+      <div class="row lobby-reactions-row" style="margin:10px 0;">
         ${LOBBY_REACTIONS.map(e => `
           <button class="lobby-react-btn ${myReactions.has(e) ? 'reacted' : ''}" data-emoji="${e}" style="padding:4px 10px;">
-            ${icon(LOBBY_REACTION_ICONS[e])} ${reactionCounts[e] || ''}
+            ${icon(LOBBY_REACTION_ICONS[e])} <small>${reactionCounts[e] || ''}</small>
           </button>
         `).join('')}
       </div>
 
-      <div class="stack" style="font-size:13px;">
-        ${lobbyComments.map(c => `
-          <div class="row between">
-            <span><b>${escapeHtml(c.author?.nickname)}</b>: ${escapeHtml(c.content)}</span>
-            ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-lobby-comment-btn" data-id="${c.id}" title="حذف کامنت" style="background:transparent;border:none;color:var(--danger);padding:0 6px;font-size:11px;opacity:.55;">${icon('xmark')}</button>` : ''}
-          </div>
-        `).join('')}
+      <div class="stack lobby-comments-list" style="font-size:13px;">
+        ${lobbyComments.map(c => lobbyCommentRowHtml(c, me)).join('')}
       </div>
       <form class="lobby-comment-form row" style="margin-top:8px;">
         <input placeholder="کامنت بذار..." />
@@ -103,7 +92,113 @@ function renderLobby(lobby, me, allComments, allReactions) {
   `
 }
 
+function lobbyActionBtn(lobby, isMember, isFull) {
+  if (isMember) return `<a href="#/lobbies/${lobby.id}"><button class="primary">ورود به چت</button></a>`
+  if (isFull) return `<button disabled>ظرفیت پره</button>`
+  return `<button class="join-lobby-btn" data-join-lobby-id="${lobby.id}">پیوستن</button>`
+}
+
+function lobbyCommentRowHtml(c, me) {
+  return `
+    <div class="row between" data-comment-id="${c.id}">
+      <span><b>${escapeHtml(c.author?.nickname)}</b>: ${escapeHtml(c.content)}</span>
+      ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-lobby-comment-btn" data-id="${c.id}" title="حذف کامنت" style="background:transparent;border:none;color:var(--danger);padding:0 6px;font-size:11px;opacity:.55;">${icon('xmark')}</button>` : ''}
+    </div>
+  `
+}
+
+// هندلرهای یه کارت لابی — هم برای رندر اولیه، هم برای کارت‌های realtime
+function bindLobbyCard(card, me) {
+  const lobbyId = card.dataset.lobbyId
+
+  // پیوستن به لابی
+  card.querySelector('.join-lobby-btn')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget
+    btn.disabled = true
+    try {
+      const { error } = await supabase.from('lobby_members').insert({ lobby_id: btn.dataset.joinLobbyId, user_id: me.id })
+      if (error) throw error
+      toast('به لابی پیوستی')
+      window.location.reload()
+    } catch (err) {
+      const msg = String(err.message || '')
+      toast(msg.includes('row-level security') ? 'نتوانستی بپیوندی — ظرفیت لابی پر شده یا بسته است' : msg, { error: true })
+      btn.disabled = false
+    }
+  })
+
+  // ریاکشن لابی: کلیک = ثبت، کلیک مجدد = لغو (تاگل) — شمارنده زنده آپدیت می‌شه
+  card.querySelectorAll('.lobby-react-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const emoji = btn.dataset.emoji
+      const active = btn.classList.contains('reacted')
+      try {
+        if (active) {
+          await supabase.from('lobby_reactions').delete().match({ lobby_id: lobbyId, user_id: me.id, emoji })
+        } else {
+          await supabase.from('lobby_reactions').insert({ lobby_id: lobbyId, user_id: me.id, emoji })
+        }
+        updateLobbyReactionsRow(card, me)
+      } catch (err) {
+        const msg = String(err.message || '')
+        toast(msg.includes('row-level security') ? 'فقط اعضای لابی می‌تونن ریاکشن بذارن — اول بپیوند' : msg, { error: true })
+      }
+    })
+  })
+
+  // حذف کامنت لابی (نویسنده یا مدیر)
+  bindLobbyCommentDeleteButtons(card)
+
+  // فرستادن کامنت — ظاهر شدنش با realtime اتفاق می‌افته (رفرش لازم نیست)
+  const commentForm = card.querySelector('.lobby-comment-form')
+  commentForm?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const input = commentForm.querySelector('input')
+    const content = input.value.trim()
+    if (!content) return
+    try {
+      await supabase.from('lobby_comments').insert({ lobby_id: lobbyId, author_id: me.id, content })
+      input.value = ''
+    } catch (err) {
+      const msg = String(err.message || '')
+      toast(msg.includes('row-level security') ? 'فقط اعضای لابی می‌تونن کامنت بذارن — اول بپیوند' : msg, { error: true })
+    }
+  })
+}
+
+function bindLobbyCommentDeleteButtons(scope) {
+  scope.querySelectorAll('.delete-lobby-comment-btn').forEach(btn => {
+    if (btn.dataset.bound) return
+    btn.dataset.bound = '1'
+    btn.addEventListener('click', async () => {
+      if (!confirm('کامنت حذف بشه؟')) return
+      try {
+        const { error } = await supabase.from('lobby_comments').delete().eq('id', btn.dataset.id)
+        if (error) throw error
+        toast('کامنت حذف شد')
+        btn.closest('[data-comment-id]')?.remove()
+      } catch (err) { toast(err.message, { error: true }) }
+    })
+  })
+}
+
+// شمارنده‌های ریاکشن یه لابی رو از دیتابیس تازه می‌کنه
+async function updateLobbyReactionsRow(card, me) {
+  const lobbyId = card.dataset.lobbyId
+  const { data: rows } = await supabase.from('lobby_reactions').select('user_id, emoji').eq('lobby_id', lobbyId)
+  const counts = {}
+  ;(rows || []).forEach(r => { counts[r.emoji] = (counts[r.emoji] || 0) + 1 })
+  const mySet = new Set((rows || []).filter(r => r.user_id === me.id).map(r => r.emoji))
+  card.querySelectorAll('.lobby-react-btn').forEach(btn => {
+    const e = btn.dataset.emoji
+    const small = btn.querySelector('small')
+    if (small) small.textContent = counts[e] || ''
+    btn.classList.toggle('reacted', mySet.has(e))
+  })
+}
+
 function mountLobbies(app, me) {
+  // ساخت لابی جدید
   const form = app.querySelector('#new-lobby-form')
   if (form) {
     form.addEventListener('submit', async (e) => {
@@ -120,6 +215,7 @@ function mountLobbies(app, me) {
           host_id: me.id
         })
         if (error) throw error
+        toast('لابی ساخته شد')
         window.location.reload()
       } catch (err) {
         toast(err.message, { error: true })
@@ -128,66 +224,84 @@ function mountLobbies(app, me) {
     })
   }
 
-  app.querySelectorAll('.join-lobby-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      btn.disabled = true
-      try {
-        const { error } = await supabase.from('lobby_members').insert({ lobby_id: btn.dataset.joinLobbyId, user_id: me.id })
-        if (error) throw error
-        window.location.reload()
-      } catch (err) {
-        // پیام قابل‌فهم به‌جای خطای خام RLS (ظرفیت پر یا لابی بسته)
-        const msg = String(err.message || '')
-        toast(msg.includes('row-level security') ? 'نتوانستی بپیوندی — ظرفیت لابی پر شده یا بسته است' : msg, { error: true })
-        btn.disabled = false
-      }
-    })
+  app.querySelectorAll('.glass.card[data-lobby-id]').forEach(card => bindLobbyCard(card, me))
+  setupLobbiesRealtime(me)
+}
+
+// ────────────────────────────────────────────────────────────────────
+// ★ Realtime لابی‌ها: لابی جدید/حذف‌شده، کامنت‌ها و ریاکشن‌ها — همه زنده
+// ────────────────────────────────────────────────────────────────────
+function setupLobbiesRealtime(me) {
+  if (lobbiesChannel) {
+    supabase.removeChannel(lobbiesChannel)
+    lobbiesChannel = null
+  }
+
+  const channel = supabase.channel(`lobbies:${Date.now()}`)
+
+  // لابی جدید → بالای لیست ظاهر می‌شه
+  channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_lobbies' }, async (payload) => {
+    const id = payload.new?.id
+    if (!id || document.querySelector(`[data-lobby-id="${id}"]`)) return
+    const { data: lobby } = await supabase
+      .from('game_lobbies')
+      .select('*, users!game_lobbies_host_id_fkey(nickname, avatar_url, neon_color), lobby_members(user_id)')
+      .eq('id', id).single()
+    if (!lobby || lobby.status === 'closed') return
+    const list = document.getElementById('lobbies-list')
+    if (!list) return
+    const empty = list.querySelector('.empty-state')
+    if (empty) empty.remove()
+    const wrap = document.createElement('div')
+    wrap.innerHTML = renderLobby(lobby, me, [], [])
+    const card = wrap.firstElementChild
+    list.prepend(card)
+    bindLobbyCard(card, me)
   })
 
-  // فقط کارت‌های لابی (نه دکمه‌ی join) — قبلاً هر دو data-lobby-id داشتن
-  // و commentForm روی دکمه null می‌شد و mount با خطا می‌ترکید
-  app.querySelectorAll('.glass.card[data-lobby-id]').forEach(card => {
-    const lobbyId = card.dataset.lobbyId
-
-    // ریاکشن لابی: کلیک = ثبت، کلیک مجدد روی همون = برداشتن (تاگل)
-    card.querySelectorAll('.lobby-react-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const emoji = btn.dataset.emoji
-        const active = btn.classList.contains('reacted')
-        try {
-          if (active) {
-            await supabase.from('lobby_reactions').delete().match({ lobby_id: lobbyId, user_id: me.id, emoji })
-          } else {
-            await supabase.from('lobby_reactions').insert({ lobby_id: lobbyId, user_id: me.id, emoji })
-          }
-          window.location.reload()
-        } catch (err) { toast(err.message, { error: true }) }
-      })
-    })
-
-    // حذف کامنت لابی: نویسنده‌ی خودش یا مدیر
-    card.querySelectorAll('.delete-lobby-comment-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm('کامنت حذف بشه؟')) return
-        try {
-          const { error } = await supabase.from('lobby_comments').delete().eq('id', btn.dataset.id)
-          if (error) throw error
-          toast('کامنت حذف شد')
-          window.location.reload()
-        } catch (err) { toast(err.message, { error: true }) }
-      })
-    })
-
-    const commentForm = card.querySelector('.lobby-comment-form')
-    commentForm?.addEventListener('submit', async (e) => {
-      e.preventDefault()
-      const input = commentForm.querySelector('input')
-      const content = input.value.trim()
-      if (!content) return
-      try {
-        await supabase.from('lobby_comments').insert({ lobby_id: lobbyId, author_id: me.id, content })
-        window.location.reload()
-      } catch (err) { toast(err.message, { error: true }) }
-    })
+  // لابی حذف‌شده → محو
+  channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'game_lobbies' }, (payload) => {
+    const id = payload.old?.id
+    if (id) document.querySelector(`[data-lobby-id="${id}"]`)?.remove()
   })
+
+  // کامنت جدید لابی → زیر همون کارت
+  channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lobby_comments' }, async (payload) => {
+    const c = payload.new
+    if (!c?.lobby_id) return
+    const card = document.querySelector(`[data-lobby-id="${c.lobby_id}"]`)
+    if (!card || card.querySelector(`[data-comment-id="${c.id}"]`)) return
+    const { data: full } = await supabase
+      .from('lobby_comments')
+      .select('*, author:users!lobby_comments_author_id_fkey(nickname, avatar_url, neon_color)')
+      .eq('id', c.id).single()
+    const container = card.querySelector('.lobby-comments-list')
+    if (!container) return
+    container.insertAdjacentHTML('beforeend', lobbyCommentRowHtml(full || c, me))
+    bindLobbyCommentDeleteButtons(container)
+  })
+
+  // کامنت حذف‌شده لابی → محو
+  channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'lobby_comments' }, (payload) => {
+    const id = payload.old?.id
+    if (id) document.querySelector(`[data-comment-id="${id}"]`)?.remove()
+  })
+
+  // ریاکشن‌های لابی → شمارنده زنده
+  channel.on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_reactions' }, (payload) => {
+    const lobbyId = payload.new?.lobby_id || payload.old?.lobby_id
+    if (!lobbyId) return
+    const card = document.querySelector(`[data-lobby-id="${lobbyId}"]`)
+    if (card) updateLobbyReactionsRow(card, me)
+  })
+
+  channel.subscribe()
+  lobbiesChannel = channel
+
+  window.addEventListener('hashchange', () => {
+    if (lobbiesChannel === channel) {
+      supabase.removeChannel(channel)
+      lobbiesChannel = null
+    }
+  }, { once: true })
 }

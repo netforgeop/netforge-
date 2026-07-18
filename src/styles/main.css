@@ -387,13 +387,23 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
    Discord-style Desktop Left Sidebar
    --------------------------------------------------------------------- */
 @media (min-width: 992px) {
+  /* ── چیدمان RTL دسکتاپ: سایدبار سفت به لبه‌ی راست، محتوا در فضای باقی‌مونده ──
+     · body راست‌به‌چپ است، پس flex row از راست شروع می‌شه.
+     · ::before یه فضای 260px سمت راست می‌گیره تا دقیقاً زیر سایدبارِ fixed بیفته
+       و محتوا «وسطِ فضای خالی باقی‌مونده» قرار بگیره (دیگه فضای خالی اضافی
+       سمت راست/چپ انباشته نمی‌شه).
+     · :has(.topnav) وقتیه که صفحه نوار داره (لاگین/بن ندارن → کاملاً وسط). */
   #app {
-    flex-direction: row-reverse;
+    flex-direction: row;
+  }
+  #app:has(.topnav)::before {
+    content: '';
+    flex: 0 0 260px;
   }
   .topnav {
     position: fixed;
     top: 0;
-    left: 0;
+    right: 0;
     bottom: 0;
     width: 260px;
     height: 100vh;
@@ -485,7 +495,10 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   }
   
   .container {
-    margin-left: 260px;
+    /* کمی پهن‌تر روی دسکتاپ + مارجین خودکار دوطرفه تا دقیقاً وسط فضای
+       سمتِ چپِ سایدبار بنشینه و هیچ قسمت خالی اضافه‌ای نمونه */
+    max-width: 720px;
+    margin-left: auto;
     margin-right: auto;
     padding-top: 40px;
   }
@@ -978,6 +991,58 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 /* فرم‌های داخل کارت: کمی فاصله از تیتر کارت */
 .card form.stack { margin-top: 4px; }
 .card form.row { margin-top: 4px; }
+
+/* =====================================================================
+   دراپ‌داون اعلان‌ها — «ثابت روی صفحه» (position:fixed)
+   حتی اگر صفحه اسکرول بشه، جاش تکون نمی‌خوره؛ موقعیتش هم با JS دقیق
+   کنار زنگوله تنظیم می‌شه تا اگر کاربر ته صفحه‌ست، بازش کرد بیرون نره.
+   ===================================================================== */
+#noti-dropdown {
+  position: fixed !important;
+  z-index: 500;
+}
+
+/* دکمه‌های تنظیمات گروه/لابی و دعوت از فالوورها */
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 14px;
+}
+.privacy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  color: var(--text-dim);
+  vertical-align: middle;
+}
+.privacy-badge.private {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ردیف‌های داخل مودال دعوت از فالوورها */
+.invite-user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+.invite-user-row:last-child { border-bottom: none; }
+
+/* فرم تنظیمات گروه/لابی داخل مودال — جداکننده‌ی ناحیه‌ی خطر */
+.danger-zone {
+  border-top: 1px solid rgba(237, 73, 86, 0.4);
+  margin-top: 14px;
+  padding-top: 14px;
+}
 
 @media (max-width: 560px) {
   .profile-header {

@@ -35,17 +35,18 @@ export function initMode() {
   applyMode(getMode())
 }
 
-const ACCENTS = ['accent-blue', 'accent-green', 'accent-red', 'accent-rgb']
+const ACCENTS = ['accent-blue', 'accent-green', 'accent-red', 'accent-rgb', 'accent-vicecity']
 
 /**
  * رنگ اصلی سایت رو از رنگ نئون انتخابی کاربر می‌گیره:
- *   'blue' | 'red' | 'green' | 'rgb-cycle'
+ *   'blue' | 'red' | 'green' | 'rgb-cycle' | 'vicecity'
  * null یعنی برگرد به پیش‌فرض (گرادیان بنفش-صورتی — مثلاً صفحه‌ی لاگین).
  */
 export function applyAccent(color) {
   const cls = color === 'red' ? 'accent-red'
     : color === 'green' ? 'accent-green'
     : color === 'rgb-cycle' ? 'accent-rgb'
+    : color === 'vicecity' ? 'accent-vicecity'
     : color === 'blue' ? 'accent-blue'
     : null
   ACCENTS.forEach(c => document.body.classList.remove(c))

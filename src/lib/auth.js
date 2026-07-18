@@ -86,6 +86,7 @@ export function neonClass(color) {
     case 'red': return 'neon-red'
     case 'green': return 'neon-green'
     case 'rgb-cycle': return 'neon-rgb'
+    case 'vicecity': return 'neon-vicecity'
     default: return 'neon-blue'
   }
 }

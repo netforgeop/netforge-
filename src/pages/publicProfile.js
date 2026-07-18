@@ -227,6 +227,7 @@ export default async function publicProfilePage(parts = []) {
                 <option value="red" ${profile.neon_color === 'red' ? 'selected' : ''}>قرمز</option>
                 <option value="green" ${profile.neon_color === 'green' ? 'selected' : ''}>سبز</option>
                 <option value="rgb-cycle" ${profile.neon_color === 'rgb-cycle' ? 'selected' : ''}>RGB متحرک</option>
+                <option value="vicecity" ${profile.neon_color === 'vicecity' ? 'selected' : ''}>🌴 Vice City (GTA)</option>
               </select>
 
               <button class="primary" type="submit">Save Changes</button>

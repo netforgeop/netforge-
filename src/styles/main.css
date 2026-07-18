@@ -49,10 +49,14 @@
 @property --neon   { syntax: '<color>'; inherits: true; initial-value: #a855f7; }
 @property --neon-soft { syntax: '<color>'; inherits: true; initial-value: rgba(168, 85, 247, 0.25); }
 
-/* ── ۱. اکسنت آبی (از پالت: 293681 ← 4274D9 ← 95CCDD ← D0E7E6) ── */
+/* ── ۱. اکسنت آبی (از پالت: 293681 ← 4274D9 ← 95CCDD ← D0E7E6) ──
+   نکته‌ی مهم: --gradient باید دوباره «داخل همین کلاس» تعریف بشه، چون CSS
+   مقدار --gradient تعریف‌شده روی :root رو همون‌جا با رنگ‌های :root محاسبه
+   و فریز می‌کنه. این‌جوری با رنگ‌های این کلاس محاسبه می‌شه. */
 body.accent-blue {
   --grad-a: #293681;
   --grad-b: #4274D9;
+  --gradient: linear-gradient(135deg, var(--grad-a), var(--grad-b));
   --gradient-hover: linear-gradient(135deg, #1e2764, #3562b5);
   --neon: #4274D9;
   --neon-soft: rgba(66, 116, 217, 0.28);
@@ -62,6 +66,7 @@ body.accent-blue {
 body.accent-green {
   --grad-a: #285A48;
   --grad-b: #408A71;
+  --gradient: linear-gradient(135deg, var(--grad-a), var(--grad-b));
   --gradient-hover: linear-gradient(135deg, #1d4436, #34735c);
   --neon: #408A71;
   --neon-soft: rgba(64, 138, 113, 0.3);
@@ -71,6 +76,7 @@ body.accent-green {
 body.accent-red {
   --grad-a: #8E1616;
   --grad-b: #D84040;
+  --gradient: linear-gradient(135deg, var(--grad-a), var(--grad-b));
   --gradient-hover: linear-gradient(135deg, #701010, #b83232);
   --neon: #D84040;
   --neon-soft: rgba(216, 64, 64, 0.28);
@@ -80,6 +86,7 @@ body.accent-red {
    رنگ‌های چرخه طوری انتخاب شدن که هم روی پس‌زمینه‌ی تیره هم روشن
    خوانا بمونن (سطح ۶۰۰ پالت Tailwind). */
 body.accent-rgb {
+  --gradient: linear-gradient(135deg, var(--grad-a), var(--grad-b));
   --gradient-hover: var(--gradient);
   animation: rgb-accent-cycle 9s linear infinite;
 }
@@ -92,12 +99,91 @@ body.accent-rgb {
   100% { --grad-a: #db2777; --grad-b: #ea580c; --neon: #db2777; --neon-soft: rgba(219, 39, 119, 0.3); }
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   ── ۵. اکسنت Vice City (حال‌وهوای GTA VI): صورتی نئونی + فیروزه‌ای ──
+   · پس‌زمینه‌ی کل سایت: غروب نخل (تصویر src/assets/vice-palms-bg.jpg)
+   · بک‌گراند دکمه‌های فعال/primary: تصویر نخل (vice-palms-btn.jpg)
+   · لوگوی N: کاشی شبیه R★ با نخل و ستاره‌ی سفید
+   ═══════════════════════════════════════════════════════════════════ */
+body.accent-vicecity {
+  --grad-a: #ff2d95;   /* صورتی نئونی میامی */
+  --grad-b: #00c2d8;   /* فیروزه‌ای اقیانوسی */
+  --gradient: linear-gradient(135deg, var(--grad-a), var(--grad-b));
+  --gradient-hover: linear-gradient(135deg, #e0267f, #00a9bb);
+  --neon: #ff2d95;
+  --neon-soft: rgba(255, 45, 149, 0.32);
+  --vice-palms-btn: linear-gradient(rgba(40, 0, 55, 0.10), rgba(40, 0, 55, 0.28)), url('../assets/vice-palms-btn.jpg');
+  /* بدنه باید شفاف بشه تا لایه‌ی ثابت ::before (غروب نخل) دیده بشه */
+  background-color: transparent;
+}
+
+/* پس‌زمینه‌ی ثابت کل سایت: غروب وایس‌سیتی (لایه‌ی ::before چسبیده به صفحه) */
+body.accent-vicecity::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(rgba(12, 4, 30, 0.45), rgba(24, 6, 45, 0.62)),
+    url('../assets/vice-palms-bg.jpg') center / cover no-repeat;
+}
+/* نسخه‌ی حالت روز: اورلی روشن‌تر تا کارت‌های سفید روش بدرخشن */
+html[data-theme-mode="light"] body.accent-vicecity::before {
+  background:
+    linear-gradient(rgba(255, 224, 244, 0.16), rgba(196, 232, 255, 0.2)),
+    url('../assets/vice-palms-bg.jpg') center / cover no-repeat;
+}
+
+/* «دکمه‌های فعال» با بک‌گراند نخل: دکمه‌های primary، تب فعال سایدبار و بج Admin */
+body.accent-vicecity button.primary,
+body.accent-vicecity .topnav .tabs button.active,
+body.accent-vicecity .badge.admin {
+  background: var(--vice-palms-btn);
+  background-size: cover;
+  background-position: center 78%;
+  border-color: rgba(255, 255, 255, 0.28);
+  text-shadow: 0 1px 4px rgba(20, 0, 40, 0.75);
+}
+body.accent-vicecity button.primary:hover {
+  background: var(--vice-palms-btn);
+  background-size: cover;
+  background-position: center 78%;
+  filter: brightness(1.15) saturate(1.1);
+}
+body.accent-vicecity button.primary:active { filter: brightness(0.95); }
+
+/* لوگوی N به سبک R★: کاشی گرد با تصویر نخل + حرف سفید درشت + ستاره‌ی سفید گوشه‌ای */
+body.accent-vicecity .topnav .brand::before {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffffff' d='M12 1.6l3 6.5 7.1.7-5.3 4.8 1.5 7L12 16.9l-6.3 3.7 1.5-7L1.9 8.8l7.1-.7z'/%3E%3C/svg%3E") no-repeat,
+    linear-gradient(rgba(40, 0, 55, 0.05), rgba(40, 0, 55, 0.18)),
+    url('../assets/vice-palms-btn.jpg');
+  background-size: 15px 15px, cover, cover;
+  background-position: right 2px bottom 1px, center, center 72%;
+  color: #fff;
+  font-style: italic;
+  font-weight: 900;
+  text-shadow: 1px 2px 0 rgba(20, 0, 40, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 3px 12px rgba(120, 0, 90, 0.5);
+}
+/* اسم برند هم متن گرادیانی نئونی بشه */
+body.accent-vicecity .topnav .brand {
+  background: linear-gradient(90deg, #ff2d95, #00c2d8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* حرف N داخل کاشی باید سفید بمونه (شفافیت متن بالا بهش ارث نرسه) */
+body.accent-vicecity .topnav .brand::before { color: #fff; }
+
 /* ── کلاس‌های neon-* برای المان‌های جدا (مثل حلقه‌ی دور آواتار هر کاربر):
    فقط رنگ نئون همون المان رو عوض می‌کنن، نه کل صفحه رو. ── */
-.neon-blue  { --neon: #4274D9; --neon-soft: rgba(66, 116, 217, 0.4); }
-.neon-green { --neon: #408A71; --neon-soft: rgba(64, 138, 113, 0.4); }
-.neon-red   { --neon: #D84040; --neon-soft: rgba(216, 64, 64, 0.4); }
-.neon-rgb   { animation: rgb-accent-cycle 9s linear infinite; }
+.neon-blue     { --neon: #4274D9; --neon-soft: rgba(66, 116, 217, 0.4); }
+.neon-green    { --neon: #408A71; --neon-soft: rgba(64, 138, 113, 0.4); }
+.neon-red      { --neon: #D84040; --neon-soft: rgba(216, 64, 64, 0.4); }
+.neon-vicecity { --neon: #ff2d95; --neon-soft: rgba(255, 45, 149, 0.42); }
+.neon-rgb      { animation: rgb-accent-cycle 9s linear infinite; }
 
 /* =====================================================================
    حالت روز (Light Mode) — با data-theme-mode="light" روی <html> فعال می‌شه

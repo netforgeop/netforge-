@@ -1,3 +1,5 @@
+import { t } from './i18n.js'
+
 export function escapeHtml(str = '') {
   return String(str)
     .replaceAll('&', '&amp;')
@@ -8,10 +10,10 @@ export function escapeHtml(str = '') {
 
 export function timeAgo(iso) {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000
-  if (diff < 60) return 'همین الان'
-  if (diff < 3600) return `${Math.floor(diff / 60)} دقیقه پیش`
-  if (diff < 86400) return `${Math.floor(diff / 3600)} ساعت پیش`
-  return `${Math.floor(diff / 86400)} روز پیش`
+  if (diff < 60) return t('همین الان', 'just now')
+  if (diff < 3600) return t(`${Math.floor(diff / 60)} دقیقه پیش`, `${Math.floor(diff / 60)}m ago`)
+  if (diff < 86400) return t(`${Math.floor(diff / 3600)} ساعت پیش`, `${Math.floor(diff / 3600)}h ago`)
+  return t(`${Math.floor(diff / 86400)} روز پیش`, `${Math.floor(diff / 86400)}d ago`)
 }
 
 export function toast(message, { error = false, ms = 3200 } = {}) {

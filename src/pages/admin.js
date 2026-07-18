@@ -2,11 +2,12 @@ import { withShell } from '../lib/shell.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { liftSanction } from '../lib/moderation.js'
+import { t, dateLocale } from '../lib/i18n.js'
 
 export default async function adminPage() {
   return withShell('admin', async (profile) => {
     if (profile.role !== 'admin') {
-      return { html: `<div class="empty-state">این بخش فقط برای ادمین قابل مشاهده‌ست.</div>` }
+      return { html: `<div class="empty-state">${t('این بخش فقط برای ادمین قابل مشاهده‌ست.', 'This section is admins-only.')}</div>` }
     }
 
     const [
@@ -24,85 +25,86 @@ export default async function adminPage() {
     ])
 
     const html = `
-      <h2>پنل ادمین</h2>
+      <h2>${t('پنل ادمین', 'Admin Panel')}</h2>
 
       <div class="glass card">
-        <h3>ساخت کد دعوت</h3>
+        <h3>${t('ساخت کد دعوت', 'Create invite code')}</h3>
         <form id="new-code-form" class="row">
-          <input name="code" placeholder="کد (مثلاً REZA-2026)" required style="flex:1;" />
+          <input name="code" placeholder="${t('کد (مثلاً REZA-2026)', 'Code (e.g. REZA-2026)')}" required style="flex:1;" />
           <input name="max_uses" type="number" min="1" value="1" style="width:90px;" />
-          <button class="primary" type="submit">بساز</button>
+          <button class="primary" type="submit">${t('بساز', 'Create')}</button>
         </form>
       </div>
 
       <div class="glass card">
-        <h3>کدهای دعوت</h3>
+        <h3>${t('کدهای دعوت', 'Invite codes')}</h3>
         ${codes?.length ? codes.map(c => `
           <div class="row between" style="margin-bottom:6px;">
-            <span>${escapeHtml(c.code)} <span class="text-dim">(${c.used_count}/${c.max_uses})</span> ${c.is_active ? '' : '<span class="badge">غیرفعال</span>'}</span>
-            ${c.is_active ? `<button class="deactivate-code-btn" data-id="${c.id}">غیرفعال کن</button>` : ''}
+            <span>${escapeHtml(c.code)} <span class="text-dim">(${c.used_count}/${c.max_uses})</span> ${c.is_active ? '' : `<span class="badge">${t('غیرفعال', 'inactive')}</span>`}</span>
+            ${c.is_active ? `<button class="deactivate-code-btn" data-id="${c.id}">${t('غیرفعال کن', 'Deactivate')}</button>` : ''}
           </div>
-        `).join('') : '<p class="text-dim">هنوز کدی ساخته نشده.</p>'}
+        `).join('') : `<p class="text-dim">${t('هنوز کدی ساخته نشده.', 'No codes yet.')}</p>`}
       </div>
 
       <div class="glass card">
-        <h3>درخواست‌های دعوت در انتظار</h3>
+        <h3>${t('درخواست‌های دعوت در انتظار', 'Pending invite requests')}</h3>
         ${requests?.length ? requests.map(r => `
           <div class="row between" style="margin-bottom:6px;">
             <span>${escapeHtml(r.requester?.nickname)}</span>
             <div class="row">
-              <button class="approve-invite-req-btn" data-id="${r.id}" data-user="${escapeHtml(r.requester?.nickname)}">تأیید و ساخت کد</button>
-              <button class="reject-invite-req-btn danger" data-id="${r.id}">رد</button>
+              <button class="approve-invite-req-btn" data-id="${r.id}" data-user="${escapeHtml(r.requester?.nickname)}">${t('تأیید و ساخت کد', 'Approve & create code')}</button>
+              <button class="reject-invite-req-btn danger" data-id="${r.id}">${t('رد', 'Reject')}</button>
             </div>
           </div>
-        `).join('') : '<p class="text-dim">درخواستی در انتظار نیست.</p>'}
+        `).join('') : `<p class="text-dim">${t('درخواستی در انتظار نیست.', 'No pending requests.')}</p>`}
       </div>
 
       <div class="glass card">
-        <h3>گزارش‌های در انتظار بررسی</h3>
+        <h3>${t('گزارش‌های در انتظار بررسی', 'Pending reports')}</h3>
         ${reports?.length ? reports.map(r => `
           <div style="margin-bottom:10px;border-bottom:1px solid var(--glass-border);padding-bottom:8px;">
-            <div>گزارش‌دهنده: ${escapeHtml(r.reporter?.nickname)} · نوع: ${r.target_type} · ${timeAgo(r.created_at)}</div>
-            ${r.reason ? `<div class="text-dim">دلیل: ${escapeHtml(r.reason)}</div>` : ''}
+            <div>${t('گزارش‌دهنده:', 'Reporter:')} ${escapeHtml(r.reporter?.nickname)} · ${t('نوع:', 'Type:')} ${r.target_type} · ${timeAgo(r.created_at)}</div>
+            ${r.reason ? `<div class="text-dim">${t('دلیل:', 'Reason:')} ${escapeHtml(r.reason)}</div>` : ''}
             <div class="row" style="margin-top:6px;">
-              ${r.target_type === 'user' && r.target_id ? `<a href="#/profile/${r.target_id}"><button style="font-size:12px;">پروفایل کاربر</button></a>` : ''}
-              <button class="dismiss-report-btn" data-id="${r.id}">بررسی شد</button>
+              ${r.target_type === 'user' && r.target_id ? `<a href="#/profile/${r.target_id}"><button style="font-size:12px;">${t('پروفایل کاربر', 'User profile')}</button></a>` : ''}
+              <button class="dismiss-report-btn" data-id="${r.id}">${t('بررسی شد', 'Dismiss')}</button>
             </div>
           </div>
-        `).join('') : '<p class="text-dim">گزارشی در انتظار نیست.</p>'}
+        `).join('') : `<p class="text-dim">${t('گزارشی در انتظار نیست.', 'No pending reports.')}</p>`}
       </div>
 
       <div class="glass card">
-        <h3>${icon('ban')} محدودیت‌های فعال (Ban/Mute/Timeout)</h3>
+        <h3>${icon('ban')} ${t('محدودیت‌های فعال (Ban/Mute/Timeout)', 'Active restrictions (Ban/Mute/Timeout)')}</h3>
         ${sanctions ? (sanctions.length ? sanctions.map(s => `
           <div class="row between" style="margin-bottom:8px; border-bottom:1px solid var(--glass-border); padding-bottom:8px;">
             <span>
               <b>${escapeHtml(s.target?.nickname || 'کاربر')}</b>
               <span class="badge danger-badge">${s.type}</span>
               <span class="text-dim" style="font-size:12px;">
-                ${s.expires_at ? `تا ${new Date(s.expires_at).toLocaleString('fa-IR')}` : 'دائم'}
+                ${s.expires_at ? `${t('تا', 'until')} ${new Date(s.expires_at).toLocaleString(dateLocale())}` : t('دائم', 'permanent')}
                 ${s.reason ? ` · ${escapeHtml(s.reason)}` : ''}
               </span>
             </span>
-            <button class="lift-sanction-btn" data-id="${s.id}">رفع محدودیت</button>
+            <button class="lift-sanction-btn" data-id="${s.id}">${t('رفع محدودیت', 'Lift')}</button>
           </div>
-        `).join('') : '<p class="text-dim">هیچ محدودیت فعالی نیست.</p>')
-        : `<p class="text-dim">${icon('triangle-exclamation')} جدول user_sanctions هنوز ساخته نشده؛ فایل moderation_setup.sql را در Supabase اجرا کنید.</p>`}
+        `).join('') : `<p class="text-dim">${t('هیچ محدودیت فعالی نیست.', 'No active restrictions.')}</p>`)
+        : `<p class="text-dim">${icon('triangle-exclamation')} ${t('جدول user_sanctions هنوز ساخته نشده؛ فایل moderation_setup.sql را در Supabase اجرا کنید.', 'user_sanctions table missing — run moderation_setup.sql in Supabase.')}</p>`}
         <p class="text-dim" style="font-size:12px; margin-top:10px;">
-          برای اعمال محدودیت جدید، به پروفایل کاربر بروید و روی «${icon('scale-balanced')} اعمال محدودیت جدید» بزنید.
+          ${t(`برای اعمال محدودیت جدید، به پروفایل کاربر بروید و روی «اعمال محدودیت جدید» بزنید.`, `To apply a new restriction, visit the user's profile and use the moderation card.`)}
         </p>
       </div>
 
       <div class="glass card">
-        <h3>کاربران</h3>
-        <p class="text-dim" style="font-size:12px;">برای ویرایش کامل (نیک‌نیم، نقش، ریست رمز، پروفایل) روی اسم کاربر کلیک کن و از کارت «مدیریت حساب» توی پروفایلش استفاده کن.</p>
+        <h3>${t('کاربران', 'Users')}</h3>
+        <p class="text-dim" style="font-size:12px;">${t('برای ویرایش کامل (نیک‌نیم، نقش، ریست رمز، پروفایل) روی اسم کاربر کلیک کن و از کارت «مدیریت حساب» توی پروفایلش استفاده کن.', 'For full editing (nickname, role, password reset, profile) click a user and use the account card on their profile.')}</p>
         ${(users || []).map(u => `
           <div class="row between" style="margin-bottom:6px;">
             <a href="#/profile/${u.id}" class="row" style="color:inherit;">
               ${escapeHtml(u.nickname)} <span class="badge ${u.role === 'admin' ? 'admin' : u.role === 'moderator' ? 'mod' : ''}">${u.role}</span>
             </a>
             <div class="row">
-              ${u.role === 'member' ? `<button class="promote-btn" data-id="${u.id}">ترفیع به Moderator</button>` : ''}
+              ${u.role === 'member' ? `<button class="promote-btn" data-id="${u.id}" style="font-size:11px; padding:4px 10px;">${icon('arrow-up')} ${t('ناظم کن', 'Make Moderator')}</button>` : ''}
+              ${u.role === 'moderator' ? `<button class="demote-btn danger" data-id="${u.id}" style="font-size:11px; padding:4px 10px;">${icon('arrow-down')} ${t('برداشتن ناظم', 'Remove Moderator')}</button>` : ''}
             </div>
           </div>
         `).join('')}
@@ -154,7 +156,7 @@ function mountAdmin(app, profile, users) {
           status: 'approved', resulting_invite_code_id: codeRow.id, reviewed_by: session.session.user.id, reviewed_at: new Date().toISOString()
         }).eq('id', btn.dataset.id)
         if (error) throw error
-        toast(`کد ساخته شد: ${newCode}`)
+        toast(t(`کد ساخته شد: ${newCode}`, `Code created: ${newCode}`))
         window.location.reload()
       } catch (err) { toast(err.message, { error: true }) }
     })
@@ -178,11 +180,26 @@ function mountAdmin(app, profile, users) {
     })
   })
 
+  // دادن نقش ناظم (Moderator)
   app.querySelectorAll('.promote-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       try {
         const { error } = await supabase.rpc('promote_to_moderator', { p_user_id: btn.dataset.id })
         if (error) throw error
+        toast(t('ناظم شد', 'Promoted to Moderator'))
+        window.location.reload()
+      } catch (err) { toast(err.message, { error: true }) }
+    })
+  })
+
+  // گرفتن نقش ناظم
+  app.querySelectorAll('.demote-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm(t('نقش ناظم این کاربر گرفته بشه؟', "Remove this user's Moderator role?"))) return
+      try {
+        const { error } = await supabase.rpc('demote_from_moderator', { p_user_id: btn.dataset.id })
+        if (error) throw error
+        toast(t('ناظمی گرفته شد', 'Moderator role removed'))
         window.location.reload()
       } catch (err) { toast(err.message, { error: true }) }
     })
@@ -193,7 +210,7 @@ function mountAdmin(app, profile, users) {
     btn.addEventListener('click', async () => {
       try {
         await liftSanction(btn.dataset.id, profile)
-        toast('محدودیت رفع شد')
+        toast(t('محدودیت رفع شد', 'Restriction lifted'))
         window.location.reload()
       } catch (err) { toast(err.message, { error: true }) }
     })

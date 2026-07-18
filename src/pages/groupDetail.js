@@ -5,11 +5,12 @@ import { defaultAvatar } from '../components/navbar.js'
 import { chatMarkup, mountChat } from '../components/chat.js'
 import { escapeHtml, toast, icon } from '../lib/utils.js'
 import { isStaff } from '../lib/moderation.js'
+import { t } from '../lib/i18n.js'
 
 export default async function groupDetailPage([groupId]) {
   return withShell('groups', async (profile) => {
     const { data: group, error } = await supabase.from('groups').select('*').eq('id', groupId).single()
-    if (error) throw new Error('این گروه پیدا نشد یا بهش دسترسی نداری')
+    if (error) throw new Error(t('این گروه پیدا نشد یا بهش دسترسی نداری', 'This group was not found or is not accessible.'))
 
     const { data: members } = await supabase
       .from('group_members')
@@ -22,6 +23,8 @@ export default async function groupDetailPage([groupId]) {
     const canManage = isGroupAdmin || isPlatformStaff
     const isPrivate = group.is_public === false
     const isCreator = group.created_by === profile.id
+    // دادن/گرفتن نقش: فقط سازنده یا مدیر پلتفرم
+    const canSetRoles = isCreator || profile.role === 'admin'
 
     // درخواست‌های در انتظار — فقط مدیر گروه/مدیر پلتفرم می‌بینه
     let pendingRequests = []
@@ -43,24 +46,24 @@ export default async function groupDetailPage([groupId]) {
     }
 
     const html = `
-      <a href="#/groups">&#8594; بازگشت به گروه‌ها</a>
+      <a href="#/groups">${t('→ بازگشت به گروه‌ها', '← Back to groups')}</a>
       <div class="row" style="margin-top:10px; flex-wrap:wrap;">
         <h2 style="margin:0;">${escapeHtml(group.name)}</h2>
         ${isPrivate
-          ? `<span class="privacy-badge private">${icon('lock')} خصوصی</span>`
-          : `<span class="privacy-badge">${icon('globe')} عمومی</span>`}
+          ? `<span class="privacy-badge private">${icon('lock')} ${t('خصوصی', 'Private')}</span>`
+          : `<span class="privacy-badge">${icon('globe')} ${t('عمومی', 'Public')}</span>`}
       </div>
       <p class="text-dim">${escapeHtml(group.description || '')}</p>
 
       <div class="header-actions">
-        ${canManage ? `<button id="group-settings-btn">${icon('gear')} تنظیمات گروه</button>` : ''}
-        ${myMembership ? `<button id="invite-friends-btn">${icon('user-plus')} دعوت از فالوورها</button>` : ''}
-        ${myMembership && !isCreator ? `<button id="leave-group-btn" class="danger">${icon('right-from-bracket')} ترک گروه</button>` : ''}
+        ${canManage ? `<button id="group-settings-btn">${icon('gear')} ${t('تنظیمات گروه', 'Group settings')}</button>` : ''}
+        ${myMembership ? `<button id="invite-friends-btn">${icon('user-plus')} ${t('دعوت از فالوورها', 'Invite followers')}</button>` : ''}
+        ${myMembership && !isCreator ? `<button id="leave-group-btn" class="danger">${icon('right-from-bracket')} ${t('ترک گروه', 'Leave group')}</button>` : ''}
       </div>
 
       ${pendingRequests.length ? `
         <div class="glass card">
-          <h3>${icon('inbox')} درخواست‌های عضویت (${pendingRequests.length})</h3>
+          <h3>${icon('inbox')} ${t('درخواست‌های عضویت', 'Join requests')} (${pendingRequests.length})</h3>
           ${pendingRequests.map(r => `
             <div class="row between" style="margin-bottom:8px;">
               <div class="row">
@@ -68,8 +71,8 @@ export default async function groupDetailPage([groupId]) {
                 ${escapeHtml(r.author?.nickname)}
               </div>
               <div class="row">
-                <button class="approve-btn" data-req="${r.id}">${icon('check')} تأیید</button>
-                <button class="reject-btn danger" data-req="${r.id}">${icon('xmark')} رد</button>
+                <button class="approve-btn" data-req="${r.id}">${icon('check')} ${t('تأیید', 'Approve')}</button>
+                <button class="reject-btn danger" data-req="${r.id}">${icon('xmark')} ${t('رد', 'Reject')}</button>
               </div>
             </div>
           `).join('')}
@@ -77,16 +80,34 @@ export default async function groupDetailPage([groupId]) {
       ` : ''}
 
       <div class="glass card">
-        <h3>اعضا (${members?.length || 0})</h3>
-        <div class="row" style="flex-wrap:wrap;">
-          ${(members || []).map(m => `
-            <a href="#/profile/${m.user_id}" class="row" style="margin-left:14px; color:inherit;">
-              <img class="avatar sm ${neonClass(m.member?.neon_color)}" src="${escapeHtml(m.member?.avatar_url || defaultAvatar(m.member?.nickname))}">
-              <span>${escapeHtml(m.member?.nickname)}</span>
-              <span class="presence-dot ${m.member?.is_online ? 'online' : ''}"></span>
-              ${m.role === 'group_admin' ? '<span class="badge mod">مدیر</span>' : ''}
-            </a>
-          `).join('')}
+        <h3>${t('اعضا', 'Members')} (${members?.length || 0})</h3>
+        <div class="stack" style="gap:8px;">
+          ${(members || []).map(m => {
+            const isTargetCreator = m.user_id === group.created_by
+            const memberRole = isTargetCreator ? 'creator' : (m.role === 'group_admin' ? 'group_admin' : 'member')
+            // کیک: سازنده هیچ‌وقت کیک نمی‌شه؛ خودم هم نه (برای خروج دکمه ترک هست)
+            const showKick = canManage && !isTargetCreator && m.user_id !== profile.id
+            const showRoleBtn = canSetRoles && !isTargetCreator
+            return `
+              <div class="row between" style="flex-wrap:wrap;">
+                <a href="#/profile/${m.user_id}" class="row" style="color:inherit;">
+                  <img class="avatar sm ${neonClass(m.member?.neon_color)}" src="${escapeHtml(m.member?.avatar_url || defaultAvatar(m.member?.nickname))}">
+                  <span>${escapeHtml(m.member?.nickname)}</span>
+                  <span class="presence-dot ${m.member?.is_online ? 'online' : ''}"></span>
+                  ${memberRole === 'creator' ? `<span class="badge admin">${icon('crown')} ${t('سازنده', 'Creator')}</span>`
+                    : memberRole === 'group_admin' ? `<span class="badge mod">${t('مدیر', 'Admin')}</span>` : ''}
+                </a>
+                ${(showKick || showRoleBtn) ? `
+                  <div class="row" style="gap:6px;">
+                    ${showRoleBtn ? (m.role === 'group_admin'
+                      ? `<button class="demote-group-admin-btn" data-user="${m.user_id}" style="padding:3px 10px; font-size:11px;">${icon('arrow-down')} ${t('عزل از مدیریت', 'Remove admin')}</button>`
+                      : `<button class="promote-group-admin-btn" data-user="${m.user_id}" style="padding:3px 10px; font-size:11px;">${icon('arrow-up')} ${t('مدیر گروه کن', 'Make admin')}</button>`) : ''}
+                    ${showKick ? `<button class="kick-member-btn danger" data-user="${m.user_id}" data-nick="${escapeHtml(m.member?.nickname || '')}" style="padding:3px 10px; font-size:11px;" title="${t('کیک از گروه', 'Kick from group')}">${icon('user-xmark')} ${t('کیک', 'Kick')}</button>` : ''}
+                  </div>
+                ` : ''}
+              </div>
+            `
+          }).join('')}
         </div>
       </div>
 
@@ -94,11 +115,11 @@ export default async function groupDetailPage([groupId]) {
         <div class="glass card" style="text-align:center; padding:30px;">
           ${isPrivate
             ? (myPendingRequest
-                ? `<p class="text-dim">${icon('clock')} درخواستت ثبت شده — منتظر تأیید مدیر گروه باش.</p>`
-                : `<p class="text-dim" style="margin-bottom:12px;">${icon('lock')} این گروه خصوصیه؛ برای عضویت باید مدیر تأیید کنه.</p>
-                   <button class="primary" id="request-join-inline-btn">${icon('paper-plane')} درخواست عضویت</button>`)
-            : `<p class="text-dim" style="margin-bottom:12px;">برای دیدن و فرستادن پیام، اول به گروه بپیوند.</p>
-               <button class="primary" id="join-group-inline-btn">پیوستن به گروه</button>`}
+                ? `<p class="text-dim">${icon('clock')} ${t('درخواستت ثبت شده — منتظر تأیید مدیر گروه باش.', 'Your request is pending — wait for the group admin.')}</p>`
+                : `<p class="text-dim" style="margin-bottom:12px;">${icon('lock')} ${t('این گروه خصوصیه؛ برای عضویت باید مدیر تأیید کنه.', 'This group is private; the admin must approve your join.')}</p>
+                   <button class="primary" id="request-join-inline-btn">${icon('paper-plane')} ${t('درخواست عضویت', 'Request to join')}</button>`)
+            : `<p class="text-dim" style="margin-bottom:12px;">${t('برای دیدن و فرستادن پیام، اول به گروه بپیوند.', 'Join the group to see and send messages.')}</p>
+               <button class="primary" id="join-group-inline-btn">${t('پیوستن به گروه', 'Join group')}</button>`}
         </div>
       `}
 
@@ -107,26 +128,26 @@ export default async function groupDetailPage([groupId]) {
         <div class="modal-backdrop" id="group-settings-modal" style="display:none;">
           <div class="glass modal">
             <div class="row between" style="margin-bottom:15px;">
-              <h3>${icon('gear')} تنظیمات گروه</h3>
+              <h3>${icon('gear')} ${t('تنظیمات گروه', 'Group settings')}</h3>
               <button class="danger" id="close-group-settings" style="padding:4px 8px;">${icon('xmark')}</button>
             </div>
             <form id="group-settings-form" class="stack">
-              <label class="text-dim">اسم گروه</label>
+              <label class="text-dim">${t('اسم گروه', 'Group name')}</label>
               <input name="name" value="${escapeHtml(group.name)}" required maxlength="60" />
 
-              <label class="text-dim">توضیح</label>
+              <label class="text-dim">${t('توضیح', 'Description')}</label>
               <textarea name="description" rows="2">${escapeHtml(group.description || '')}</textarea>
 
-              <label class="text-dim">نوع گروه</label>
+              <label class="text-dim">${t('نوع گروه', 'Group type')}</label>
               <select name="is_public">
-                <option value="public" ${!isPrivate ? 'selected' : ''}>عمومی — هرکس مستقیم عضو می‌شه</option>
-                <option value="private" ${isPrivate ? 'selected' : ''}>خصوصی — عضویت با تأیید مدیر</option>
+                <option value="public" ${!isPrivate ? 'selected' : ''}>${t('عمومی — هرکس مستقیم عضو می‌شه', 'Public — anyone joins instantly')}</option>
+                <option value="private" ${isPrivate ? 'selected' : ''}>${t('خصوصی — عضویت با تأیید مدیر', 'Private — join needs approval')}</option>
               </select>
 
-              <button class="primary" type="submit">${icon('floppy-disk')} ذخیره تغییرات</button>
+              <button class="primary" type="submit">${icon('floppy-disk')} ${t('ذخیره تغییرات', 'Save changes')}</button>
             </form>
             <div class="danger-zone">
-              <button class="danger" id="delete-group-btn" style="width:100%;">${icon('trash-can')} حذف کامل گروه (برگشت‌ناپذیر)</button>
+              <button class="danger" id="delete-group-btn" style="width:100%;">${icon('trash-can')} ${t('حذف کامل گروه (برگشت‌ناپذیر)', 'Delete group permanently')}</button>
             </div>
           </div>
         </div>
@@ -137,11 +158,11 @@ export default async function groupDetailPage([groupId]) {
         <div class="modal-backdrop" id="invite-friends-modal" style="display:none;">
           <div class="glass modal">
             <div class="row between" style="margin-bottom:15px;">
-              <h3>${icon('user-plus')} دعوت به «${escapeHtml(group.name)}»</h3>
+              <h3>${icon('user-plus')} ${t(`دعوت به «${group.name}»`, `Invite to "${group.name}"`)}</h3>
               <button class="danger" id="close-invite-friends" style="padding:4px 8px;">${icon('xmark')}</button>
             </div>
             <div id="invite-friends-list" class="stack" style="gap:4px;">
-              <div class="text-dim" style="text-align:center;">در حال بارگذاری فالوورها...</div>
+              <div class="text-dim" style="text-align:center;">${t('در حال بارگذاری فالوورها...', 'Loading followers...')}</div>
             </div>
           </div>
         </div>
@@ -166,7 +187,7 @@ export default async function groupDetailPage([groupId]) {
           try {
             const { error: joinErr } = await supabase.from('group_members').insert({ group_id: groupId, user_id: profile.id })
             if (joinErr) throw joinErr
-            toast('به گروه پیوستی')
+            toast(t('به گروه پیوستی', 'You joined the group'))
             window.location.reload()
           } catch (err) {
             toast(err.message, { error: true })
@@ -182,7 +203,7 @@ export default async function groupDetailPage([groupId]) {
               group_id: groupId, user_id: profile.id, status: 'pending'
             })
             if (reqErr) throw reqErr
-            toast('درخواستت برای مدیر گروه فرستاده شد')
+            toast(t('درخواستت برای مدیر گروه فرستاده شد', 'Request sent to the group admin'))
             window.location.reload()
           } catch (err) {
             toast(err.message, { error: true })
@@ -192,7 +213,7 @@ export default async function groupDetailPage([groupId]) {
 
         // ترک گروه
         app.querySelector('#leave-group-btn')?.addEventListener('click', async (e) => {
-          if (!confirm('از گروه خارج می‌شی؟')) return
+          if (!confirm(t('از گروه خارج می‌شی؟', 'Leave this group?'))) return
           e.target.disabled = true
           try {
             const { error: leaveErr } = await supabase.from('group_members').delete()
@@ -203,6 +224,44 @@ export default async function groupDetailPage([groupId]) {
             toast(err.message, { error: true })
             e.target.disabled = false
           }
+        })
+
+        // ── کیک عضو (RPC امن) ──
+        app.querySelectorAll('.kick-member-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            if (!confirm(t(`${btn.dataset.nick} از گروه کیک بشه؟`, `Kick ${btn.dataset.nick} from the group?`))) return
+            btn.disabled = true
+            try {
+              const { error: kickErr } = await supabase.rpc('kick_group_member', { p_group_id: groupId, p_user_id: btn.dataset.user })
+              if (kickErr) throw kickErr
+              toast(t('کاربر کیک شد', 'Member kicked'))
+              window.location.reload()
+            } catch (err) {
+              toast(err.message, { error: true })
+              btn.disabled = false
+            }
+          })
+        })
+
+        // ── دادن/گرفتن نقش مدیر گروه ──
+        app.querySelectorAll('.promote-group-admin-btn, .demote-group-admin-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const promote = btn.classList.contains('promote-group-admin-btn')
+            btn.disabled = true
+            try {
+              const { error: roleErr } = await supabase.rpc('set_group_member_role', {
+                p_group_id: groupId,
+                p_user_id: btn.dataset.user,
+                p_role: promote ? 'group_admin' : 'member'
+              })
+              if (roleErr) throw roleErr
+              toast(promote ? t('مدیر گروه شد', 'Made group admin') : t('مدیریتش گرفته شد', 'Admin role removed'))
+              window.location.reload()
+            } catch (err) {
+              toast(err.message, { error: true })
+              btn.disabled = false
+            }
+          })
         })
 
         // ── مودال تنظیمات گروه ──
@@ -224,7 +283,7 @@ export default async function groupDetailPage([groupId]) {
               is_public: fd.get('is_public') === 'public'
             }).eq('id', groupId)
             if (updErr) throw updErr
-            toast('تنظیمات گروه ذخیره شد')
+            toast(t('تنظیمات گروه ذخیره شد', 'Group settings saved'))
             window.location.reload()
           } catch (err) {
             toast(err.message, { error: true })
@@ -234,13 +293,13 @@ export default async function groupDetailPage([groupId]) {
 
         // حذف کامل گروه (دوتا تأیید برای اطمینان)
         app.querySelector('#delete-group-btn')?.addEventListener('click', async (e) => {
-          if (!confirm('گروه با همه‌ی پیام‌ها و اعضاش برای همیشه حذف بشه؟')) return
-          if (!confirm('واقعاً مطمئنی؟ این کار برگشت‌ناپذیره!')) return
+          if (!confirm(t('گروه با همه‌ی پیام‌ها و اعضاش برای همیشه حذف بشه؟', 'Delete the group with all messages and members forever?'))) return
+          if (!confirm(t('واقعاً مطمئنی؟ این کار برگشت‌ناپذیره!', 'Are you sure? This cannot be undone!'))) return
           e.target.disabled = true
           try {
             const { error: delErr } = await supabase.rpc('delete_group', { p_group_id: groupId })
             if (delErr) throw delErr
-            toast('گروه حذف شد')
+            toast(t('گروه حذف شد', 'Group deleted'))
             window.location.hash = '/groups'
           } catch (err) {
             toast(err.message, { error: true })
@@ -264,7 +323,7 @@ export default async function groupDetailPage([groupId]) {
             // فقط فالوورهایی که عضو گروه نیستن قابل دعوت‌ان
             const rows = (follows || []).filter(f => !memberIds.has(f.follower_id))
             if (!rows.length) {
-              inviteList.innerHTML = `<div class="text-dim" style="text-align:center; padding:14px;">همه‌ی فالوورهات عضو گروهن (یا هنوز فالووری نداری).</div>`
+              inviteList.innerHTML = `<div class="text-dim" style="text-align:center; padding:14px;">${t('همه‌ی فالوورهات عضو گروهن (یا هنوز فالووری نداری).', 'All your followers are already in (or you have none yet).')}</div>`
               return
             }
             inviteList.innerHTML = rows.map(f => `
@@ -273,7 +332,7 @@ export default async function groupDetailPage([groupId]) {
                   <img class="avatar sm ${neonClass(f.follower?.neon_color)}" src="${escapeHtml(f.follower?.avatar_url || defaultAvatar(f.follower?.nickname))}">
                   <b>${escapeHtml(f.follower?.nickname || '')}</b>
                 </div>
-                <button class="send-group-invite-btn primary" data-user-id="${f.follower_id}" style="padding:4px 14px; font-size:12px;">${icon('paper-plane')} دعوت</button>
+                <button class="send-group-invite-btn primary" data-user-id="${f.follower_id}" style="padding:4px 14px; font-size:12px;">${icon('paper-plane')} ${t('دعوت', 'Invite')}</button>
               </div>
             `).join('')
             inviteList.querySelectorAll('.send-group-invite-btn').forEach(btn => {
@@ -285,10 +344,10 @@ export default async function groupDetailPage([groupId]) {
                     sender_id: profile.id,
                     type: 'group_invite',
                     target_id: groupId,
-                    message: `${profile.nickname} تورو به گروه «${group.name}» دعوت کرد`
+                    message: t(`${profile.nickname} تورو به گروه «${group.name}» دعوت کرد`, `${profile.nickname} invited you to the group "${group.name}"`)
                   })
                   if (invErr) throw invErr
-                  btn.innerHTML = `${icon('check')} دعوت شد`
+                  btn.innerHTML = `${icon('check')} ${t('دعوت شد', 'Invited')}`
                 } catch (err) {
                   toast(err.message, { error: true })
                   btn.disabled = false
@@ -315,7 +374,7 @@ async function reviewRequest(requestId, approve) {
   try {
     const { error } = await supabase.rpc('review_group_join_request', { p_request_id: requestId, p_approve: approve })
     if (error) throw error
-    toast(approve ? 'کاربر پذیرفته شد' : 'درخواست رد شد')
+    toast(approve ? t('کاربر پذیرفته شد', 'Member approved') : t('درخواست رد شد', 'Request rejected'))
     window.location.reload()
   } catch (err) {
     toast(err.message, { error: true })

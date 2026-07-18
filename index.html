@@ -9,12 +9,15 @@
     <!-- آیکون‌پک Font Awesome (به‌جای ایموجی‌ها در کل رابط کاربری) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script>
-      // اعمال فوری حالت روز/شب «قبل» از رندر صفحه، تا سایت چشمک نزند.
-      // مقدارش رو دکمه‌ی خورشید/ماه توی نوار کناری (navbar) توی localStorage ذخیره می‌کنه.
+      // اعمال فوری حالت روز/شب و زبان «قبل» از رندر صفحه، تا سایت چشمک نزند.
+      // nf_mode : دکمه‌ی خورشید/ماه توی نوار کناری  ·  nf_lang : دکمه‌ی زبان (fa/en)
       try {
         if (localStorage.getItem('nf_mode') === 'light') {
           document.documentElement.dataset.themeMode = 'light'
         }
+        var nfLang = localStorage.getItem('nf_lang') === 'en' ? 'en' : 'fa'
+        document.documentElement.lang = nfLang
+        document.documentElement.dir = nfLang === 'en' ? 'ltr' : 'rtl'
       } catch (e) { /* localStorage در دسترس نیست */ }
     </script>
   </head>

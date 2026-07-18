@@ -4,6 +4,7 @@ import { showResponsibilityModal } from '../components/responsibilityModal.js'
 import { getMyActiveSanction, sanctionMessage } from './moderation.js'
 import { escapeHtml, icon } from './utils.js'
 import { applyAccent } from './appearance.js'
+import { t } from './i18n.js'
 
 /**
  * هر صفحه‌ی داخل داشبورد این رو صدا می‌زنه:
@@ -20,7 +21,7 @@ export async function withShell(activeTab, buildContent) {
 
   const profile = await getMyProfile()
   if (!profile) {
-    return { html: `<div class="container empty-state">پروفایل پیدا نشد. لطفاً دوباره وارد شوید.</div>` }
+    return { html: `<div class="container empty-state">${t('پروفایل پیدا نشد. لطفاً دوباره وارد شوید.', 'Profile not found. Please log in again.')}</div>` }
   }
 
   // رنگ اصلی سایت (دکمه‌های primary، تب فعال، بج‌ها، حباب چت من) از
@@ -40,10 +41,10 @@ export async function withShell(activeTab, buildContent) {
       <div class="container" style="max-width:480px; padding-top:80px;">
         <div class="glass" style="padding:32px; text-align:center;">
           <div style="font-size:48px; color:var(--danger);"><i class="fa-solid fa-ban"></i></div>
-          <h2>حساب شما مسدود شده است</h2>
+          <h2>${t('حساب شما مسدود شده است', 'Your account is banned')}</h2>
           <p class="text-dim">${escapeHtml(sanctionMessage(sanction))}</p>
-          ${sanction.reason ? `<p class="text-dim">دلیل: ${escapeHtml(sanction.reason)}</p>` : ''}
-          <button id="banned-logout-btn" class="danger" style="margin-top:15px;">خروج از حساب</button>
+          ${sanction.reason ? `<p class="text-dim">${t('دلیل:', 'Reason:')} ${escapeHtml(sanction.reason)}</p>` : ''}
+          <button id="banned-logout-btn" class="danger" style="margin-top:15px;">${t('خروج از حساب', 'Log out')}</button>
         </div>
       </div>
     `

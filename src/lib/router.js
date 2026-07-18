@@ -1,5 +1,7 @@
 const routes = new Map()
-let notFoundHandler = () => `<div class="container empty-state">صفحه پیدا نشد.</div>`
+import { t } from './i18n.js'
+
+let notFoundHandler = () => `<div class="container empty-state">${t('صفحه پیدا نشد.', 'Page not found.')}</div>`
 let renderToken = 0
 
 export function route(path, handler) {

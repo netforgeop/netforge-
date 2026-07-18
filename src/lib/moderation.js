@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient.js'
 import { toast, icon } from './utils.js'
+import { t, dateLocale } from './i18n.js'
 
 // آیا کاربر فعلی ادمین یا ناظم است؟
 export function isStaff(profile) {
@@ -28,13 +29,13 @@ export async function getMyActiveSanction(myId) {
 export function sanctionMessage(s) {
   if (!s) return ''
   const expiry = s.expires_at
-    ? ` تا ${new Date(s.expires_at).toLocaleString('fa-IR')}`
-    : ' (دائم)'
+    ? ` ${t('تا', 'until')} ${new Date(s.expires_at).toLocaleString(dateLocale())}`
+    : t(' (دائم)', ' (permanent)')
   switch (s.type) {
-    case 'ban': return `حساب شما مسدود شده است${expiry}.`
-    case 'mute': return `شما میوت هستید و نمی‌توانید محتوا بفرستید${expiry}.`
-    case 'timeout': return `شما در تایم‌اوت هستید${expiry}.`
-    default: return 'حساب شما محدود شده است.'
+    case 'ban': return t(`حساب شما مسدود شده است${expiry}.`, `Your account is banned${expiry}.`)
+    case 'mute': return t(`شما میوت هستید و نمی‌توانید محتوا بفرستید${expiry}.`, `You are muted and cannot post content${expiry}.`)
+    case 'timeout': return t(`شما در تایم‌اوت هستید${expiry}.`, `You are in timeout${expiry}.`)
+    default: return t('حساب شما محدود شده است.', 'Your account is restricted.')
   }
 }
 
@@ -42,7 +43,7 @@ export function sanctionMessage(s) {
 // اکشن‌های مدیریتی روی یک کاربر هدف (از پروفایل عمومی یا پنل ادمین)
 // --------------------------------------------------------------------
 export async function applySanction(me, { userId, type, minutes = null, reason = '' }) {
-  if (!isStaff(me)) throw new Error('دسترسی کافی نداری')
+  if (!isStaff(me)) throw new Error(t('دسترسی کافی نداری', 'Not enough permission'))
   const row = {
     user_id: userId,
     type,
@@ -110,32 +111,32 @@ export function openSanctionModal(me, targetUser, onDone) {
   const wrap = document.createElement('div')
   wrap.className = 'modal-backdrop'
   wrap.innerHTML = `
-    <div class="glass modal" dir="rtl">
+    <div class="glass modal">
       <div class="row between" style="margin-bottom:15px;">
-        <h3>${icon('scale-balanced')} محدود کردن ${targetUser.nickname}</h3>
+        <h3>${icon('scale-balanced')} ${t(`محدود کردن ${targetUser.nickname}`, `Restrict ${targetUser.nickname}`)}</h3>
         <button class="danger" id="sm-close" style="padding:4px 8px;">${icon('xmark')}</button>
       </div>
       <div class="stack">
-        <label class="text-dim">نوع محدودیت</label>
+        <label class="text-dim">${t('نوع محدودیت', 'Restriction type')}</label>
         <select id="sm-type">
-          <option value="timeout">تایم‌اوت (موقت، غیرفعال شدن ارسال محتوا)</option>
-          <option value="mute">میوت (قطع ارسال محتوا تا رفع دستی)</option>
-          <option value="ban">بن (مسدود شدن کامل حساب)</option>
+          <option value="timeout">${t('تایم‌اوت (موقت، غیرفعال شدن ارسال محتوا)', 'Timeout (temporary block from posting)')}</option>
+          <option value="mute">${t('میوت (قطع ارسال محتوا تا رفع دستی)', 'Mute (no posting until lifted)')}</option>
+          <option value="ban">${t('بن (مسدود شدن کامل حساب)', 'Ban (full account block)')}</option>
         </select>
 
-        <label class="text-dim">مدت زمان</label>
+        <label class="text-dim">${t('مدت زمان', 'Duration')}</label>
         <select id="sm-duration">
-          <option value="10">۱۰ دقیقه</option>
-          <option value="60" selected>۱ ساعت</option>
-          <option value="1440">۱ روز</option>
-          <option value="10080">۱ هفته</option>
-          <option value="">دائم (تا رفع دستی)</option>
+          <option value="10">${t('۱۰ دقیقه', '10 minutes')}</option>
+          <option value="60" selected>${t('۱ ساعت', '1 hour')}</option>
+          <option value="1440">${t('۱ روز', '1 day')}</option>
+          <option value="10080">${t('۱ هفته', '1 week')}</option>
+          <option value="">${t('دائم (تا رفع دستی)', 'Permanent (until lifted)')}</option>
         </select>
 
-        <label class="text-dim">دلیل (اختیاری)</label>
-        <input id="sm-reason" placeholder="مثلاً: اسپم در چت گروه" />
+        <label class="text-dim">${t('دلیل (اختیاری)', 'Reason (optional)')}</label>
+        <input id="sm-reason" placeholder="${t('مثلاً: اسپم در چت گروه', 'e.g. spam in group chat')}" />
 
-        <button class="danger" id="sm-apply">اعمال محدودیت</button>
+        <button class="danger" id="sm-apply">${t('اعمال محدودیت', 'Apply restriction')}</button>
       </div>
     </div>
   `
@@ -152,7 +153,7 @@ export function openSanctionModal(me, targetUser, onDone) {
       const minutes = durVal === '' ? null : Number(durVal)
       const reason = wrap.querySelector('#sm-reason').value.trim()
       await applySanction(me, { userId: targetUser.id, type, minutes, reason })
-      toast(`محدودیت ${type} روی ${targetUser.nickname} اعمال شد`)
+      toast(t(`محدودیت ${type} روی ${targetUser.nickname} اعمال شد`, `Restriction ${type} applied to ${targetUser.nickname}`))
       wrap.remove()
       onDone?.()
     } catch (err) {

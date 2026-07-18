@@ -1,6 +1,7 @@
 import { withShell } from '../lib/shell.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
+import { t } from '../lib/i18n.js'
 
 export default async function groupsPage() {
   return withShell('groups', async (profile) => {
@@ -16,20 +17,20 @@ export default async function groupsPage() {
 
     const html = `
       <div class="glass card">
-        <h3>ساخت گروه جدید</h3>
+        <h3>${t('ساخت گروه جدید', 'Create a new group')}</h3>
         <form id="new-group-form" class="stack">
-          <input name="name" placeholder="اسم گروه" required maxlength="60" />
-          <textarea name="description" placeholder="توضیح کوتاه" rows="2"></textarea>
+          <input name="name" placeholder="${t('اسم گروه', 'Group name')}" required maxlength="60" />
+          <textarea name="description" placeholder="${t('توضیح کوتاه', 'Short description')}" rows="2"></textarea>
           <select name="is_public">
-            <option value="public">گروه عمومی — هرکس مستقیم عضو می‌شه</option>
-            <option value="private">گروه خصوصی — عضویت فقط با تأیید مدیر</option>
+            <option value="public">${t('گروه عمومی — هرکس مستقیم عضو می‌شه', 'Public group — anyone joins instantly')}</option>
+            <option value="private">${t('گروه خصوصی — عضویت فقط با تأیید مدیر', 'Private group — join needs admin approval')}</option>
           </select>
-          <button class="primary" type="submit">ساخت گروه</button>
+          <button class="primary" type="submit">${t('ساخت گروه', 'Create group')}</button>
         </form>
       </div>
 
       <div id="groups-list">
-        ${groups.length ? groups.map(g => renderGroup(g, memberGroupIds, pendingGroupIds)).join('') : `<div class="empty-state">هنوز گروهی ساخته نشده.</div>`}
+        ${groups.length ? groups.map(g => renderGroup(g, memberGroupIds, pendingGroupIds)).join('') : `<div class="empty-state">${t('هنوز گروهی ساخته نشده.', 'No groups yet.')}</div>`}
       </div>
     `
 
@@ -44,26 +45,26 @@ function renderGroup(g, memberIds, pendingIds) {
   const isPrivate = g.is_public === false
 
   const privacyBadge = isPrivate
-    ? `<span class="privacy-badge private">${icon('lock')} خصوصی</span>`
-    : `<span class="privacy-badge">${icon('globe')} عمومی</span>`
+    ? `<span class="privacy-badge private">${icon('lock')} ${t('خصوصی', 'Private')}</span>`
+    : `<span class="privacy-badge">${icon('globe')} ${t('عمومی', 'Public')}</span>`
 
   let actionBtn
   if (isMember) {
-    actionBtn = `<a href="#/groups/${g.id}"><button class="primary">ورود به گروه</button></a>`
+    actionBtn = `<a href="#/groups/${g.id}"><button class="primary">${t('ورود به گروه', 'Enter group')}</button></a>`
   } else if (isPending) {
-    actionBtn = `<button disabled>${icon('clock')} در انتظار تأیید مدیر</button>`
+    actionBtn = `<button disabled>${icon('clock')} ${t('در انتظار تأیید مدیر', 'Awaiting approval')}</button>`
   } else if (isPrivate) {
     // گروه خصوصی: درخواست عضویت می‌ره برای سازنده و اون تأیید می‌کنه
-    actionBtn = `<button class="request-join-btn" data-group-id="${g.id}">${icon('paper-plane')} درخواست عضویت</button>`
+    actionBtn = `<button class="request-join-btn" data-group-id="${g.id}">${icon('paper-plane')} ${t('درخواست عضویت', 'Request to join')}</button>`
   } else {
     // گروه عمومی: عضویت فوری
-    actionBtn = `<button class="join-group-btn" data-group-id="${g.id}">پیوستن</button>`
+    actionBtn = `<button class="join-group-btn" data-group-id="${g.id}">${t('پیوستن', 'Join')}</button>`
   }
 
   return `
     <div class="glass card row between">
       <div>
-        <div class="row"><b>${escapeHtml(g.name)}</b> ${privacyBadge} <span class="text-dim">· ${count} عضو</span></div>
+        <div class="row"><b>${escapeHtml(g.name)}</b> ${privacyBadge} <span class="text-dim">· ${count} ${t('عضو', 'members')}</span></div>
         <p class="text-dim" style="margin:6px 0 0;">${escapeHtml(g.description || '')}</p>
         <span class="text-dim" style="font-size:11px;">${timeAgo(g.created_at)}</span>
       </div>
@@ -88,7 +89,7 @@ function mountGroups(app, me) {
           created_by: me.id
         })
         if (error) throw error
-        toast('گروه ساخته شد')
+        toast(t('گروه ساخته شد', 'Group created'))
         window.location.reload()
       } catch (err) {
         toast(err.message, { error: true })
@@ -110,7 +111,7 @@ function mountGroups(app, me) {
           return
         }
         if (error) throw error
-        toast('به گروه پیوستی')
+        toast(t('به گروه پیوستی', 'You joined the group'))
         window.location.reload()
       } catch (err) {
         toast(err.message, { error: true })
@@ -130,12 +131,12 @@ function mountGroups(app, me) {
         if (error) {
           // ایندکس pendingِ یکتا جلوی تکراری‌ها رو می‌گیره
           if (String(error.code) === '23505') {
-            toast('درخواستت از قبل ثبت شده — منتظر تأیید مدیر باش', { error: true })
+            toast(t('درخواستت از قبل ثبت شده — منتظر تأیید مدیر باش', 'Already requested — please wait for approval'), { error: true })
             return
           }
           throw error
         }
-        toast('درخواستت برای مدیر گروه فرستاده شد')
+        toast(t('درخواستت برای مدیر گروه فرستاده شد', 'Request sent to the group admin'))
         window.location.reload()
       } catch (err) {
         toast(err.message, { error: true })

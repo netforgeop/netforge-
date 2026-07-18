@@ -5,6 +5,7 @@ import { defaultAvatar } from '../components/navbar.js'
 import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { reportBlockMarkup, attachReportBlock } from '../components/reportBlock.js'
 import { isStaff, deletePostAsStaff, deleteCommentAsStaff } from '../lib/moderation.js'
+import { t } from '../lib/i18n.js'
 
 // کلید ریاکشن (همون مقدار قدیمی دیتابیسه) → آیکون Font Awesome
 const EMOJIS = ['👍', '❤️', '😂', '😮', '🔥']
@@ -44,7 +45,7 @@ export default async function feedPage() {
 
     const html = `
       <div id="posts-list" class="instagram-feed-container">
-        ${feedPosts.length ? feedPosts.map(p => renderPost(p, profile, ratings, comments, reactions, blockedIds)).join('') : `<div class="empty-state">هنوز پستی نیست. اولین نفر باش.</div>`}
+        ${feedPosts.length ? feedPosts.map(p => renderPost(p, profile, ratings, comments, reactions, blockedIds)).join('') : `<div class="empty-state">${t('هنوز پستی نیست. اولین نفر باش.', 'No posts yet — be the first!')}</div>`}
       </div>
     `
 
@@ -81,7 +82,7 @@ function renderPost(post, me, allRatings, allComments, allReactions, blockedIds 
           <span class="time" style="font-size:12px; color:var(--text-dim);">${timeAgo(post.created_at)}</span>
         </div>
         <div class="row" style="gap:8px;">
-          ${showDelete ? `<button class="delete-post-btn-insta" data-id="${post.id}">${isMyPost ? 'حذف' : `${icon('shield-halved')} حذف`}</button>` : ''}
+          ${showDelete ? `<button class="delete-post-btn-insta" data-id="${post.id}">${isMyPost ? t('حذف', 'Delete') : `${icon('shield-halved')} ${t('حذف', 'Delete')}`}</button>` : ''}
           ${post.author_id !== me.id ? reportBlockMarkup(post.author_id, { targetType: 'post', targetId: post.id }) : ''}
         </div>
       </div>
@@ -123,7 +124,7 @@ function renderPost(post, me, allRatings, allComments, allReactions, blockedIds 
 
       <div class="post-comments-section">
         ${postComments.length > 0 ? `
-          <div class="view-all-comments-btn">مشاهده همه ${postComments.length} کامنت</div>
+          <div class="view-all-comments-btn">${t(`مشاهده همه ${postComments.length} کامنت`, `View all ${postComments.length} comments`)}</div>
           <div class="comments-container stack" style="gap:6px;">
             ${postComments.map(c => commentRowHtml(c, me)).join('')}
           </div>
@@ -131,11 +132,11 @@ function renderPost(post, me, allRatings, allComments, allReactions, blockedIds 
       </div>
 
       ${['mute', 'timeout', 'ban'].includes(me.activeSanction?.type) ? `
-        <div class="text-dim" style="text-align:center; font-size:13px; padding:6px;">${icon('volume-xmark')} به خاطر محدودیت فعال نمی‌توانید کامنت بگذارید.</div>
+        <div class="text-dim" style="text-align:center; font-size:13px; padding:6px;">${icon('volume-xmark')} ${t('به خاطر محدودیت فعال نمی‌توانید کامنت بگذارید.', "You can't comment due to an active restriction.")}</div>
       ` : `
         <form class="comment-form-insta row">
-          <input placeholder="کامنت بذار..." required />
-          <button type="submit">ارسال</button>
+          <input placeholder="${t('کامنت بذار...', 'Add a comment...')}" required />
+          <button type="submit">${t('ارسال', 'Post')}</button>
         </form>
       `}
     </div>
@@ -144,7 +145,7 @@ function renderPost(post, me, allRatings, allComments, allReactions, blockedIds 
 
 function avgText(postRatings) {
   const avg = postRatings.length ? (postRatings.reduce((s, r) => s + r.score, 0) / postRatings.length).toFixed(1) : null
-  return avg ? `${avg}/10` : 'امتیاز دهید'
+  return avg ? `${avg}/10` : t('امتیاز دهید', 'Rate it')
 }
 
 function commentRowHtml(c, me) {
@@ -152,7 +153,7 @@ function commentRowHtml(c, me) {
     <div class="comment-row" data-comment-id="${c.id}">
       <span class="bold-username">${escapeHtml(c.author?.nickname)}</span>
       <span>${escapeHtml(c.content)}</span>
-      ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-comment-btn" data-id="${c.id}" title="حذف کامنت">${icon('xmark')}</button>` : ''}
+      ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-comment-btn" data-id="${c.id}" title="${t('حذف کامنت', 'Delete comment')}">${icon('xmark')}</button>` : ''}
     </div>
   `
 }
@@ -184,7 +185,7 @@ function bindPostCard(card, me) {
         await supabase.from('post_ratings').upsert({
           post_id: postId, user_id: me.id, score: val, updated_at: new Date().toISOString()
         })
-        toast(`امتیاز ${val} ثبت شد`)
+        toast(t(`امتیاز ${val} ثبت شد`, `Rated ${val}`))
         updateRatingDisplay(card, me)
       } catch (err) { toast(err.message, { error: true }) }
     })
@@ -204,10 +205,10 @@ function bindPostCard(card, me) {
 
   const deleteBtn = card.querySelector('.delete-post-btn-insta')
   deleteBtn?.addEventListener('click', async () => {
-    if (!confirm('آیا از حذف این پست مطمئن هستید؟')) return
+    if (!confirm(t('آیا از حذف این پست مطمئن هستید؟', 'Delete this post?'))) return
     try {
       await deletePostAsStaff(deleteBtn.dataset.id)
-      toast('پست حذف شد')
+      toast(t('پست حذف شد', 'Post deleted'))
       document.querySelector(`[data-post-id="${deleteBtn.dataset.id}"]`)?.remove()
     } catch (err) {
       toast(err.message, { error: true })
@@ -222,10 +223,10 @@ function bindCommentDeleteButtons(scope) {
     if (btn.dataset.bound) return
     btn.dataset.bound = '1'
     btn.addEventListener('click', async () => {
-      if (!confirm('کامنت حذف بشه؟')) return
+      if (!confirm(t('کامنت حذف بشه؟', 'Delete this comment?'))) return
       try {
         await deleteCommentAsStaff(btn.dataset.id)
-        toast('کامنت حذف شد')
+        toast(t('کامنت حذف شد', 'Comment deleted'))
         btn.closest('.comment-row')?.remove()
       } catch (err) { toast(err.message, { error: true }) }
     })
@@ -319,7 +320,7 @@ function setupFeedRealtime(me, blockedIds) {
     let container = section.querySelector('.comments-container')
     if (!container) {
       section.insertAdjacentHTML('afterbegin', `
-        <div class="view-all-comments-btn">مشاهده همه 1 کامنت</div>
+        <div class="view-all-comments-btn">${t('مشاهده همه 1 کامنت', 'View 1 comment')}</div>
         <div class="comments-container stack" style="gap:6px;"></div>
       `)
       container = section.querySelector('.comments-container')
@@ -327,7 +328,7 @@ function setupFeedRealtime(me, blockedIds) {
     container.insertAdjacentHTML('beforeend', commentRowHtml(comment, me))
     bindCommentDeleteButtons(container)
     const viewBtn = section.querySelector('.view-all-comments-btn')
-    if (viewBtn) viewBtn.textContent = `مشاهده همه ${container.children.length} کامنت`
+    if (viewBtn) viewBtn.textContent = t(`مشاهده همه ${container.children.length} کامنت`, `View all ${container.children.length} comments`)
   })
 
   // کامنت حذف‌شده → بلافاصله محو می‌شه (replica identity full = post_id دستمونه)
@@ -340,7 +341,7 @@ function setupFeedRealtime(me, blockedIds) {
     row.remove()
     if (container) {
       const viewBtn = container.parentElement?.querySelector('.view-all-comments-btn')
-      if (viewBtn) viewBtn.textContent = container.children.length ? `مشاهده همه ${container.children.length} کامنت` : ''
+      if (viewBtn) viewBtn.textContent = container.children.length ? t(`مشاهده همه ${container.children.length} کامنت`, `View all ${container.children.length} comments`) : ''
     }
   })
 

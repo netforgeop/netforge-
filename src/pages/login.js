@@ -1,6 +1,7 @@
 import { signUp, logIn, getSession } from '../lib/auth.js'
-import { toast } from '../lib/utils.js'
+import { toast, icon } from '../lib/utils.js'
 import { applyAccent } from '../lib/appearance.js'
+import { t, getLang, setLang } from '../lib/i18n.js'
 
 export default async function loginPage() {
   // رنگ اصلی سایت رو به پیش‌فرض (بنفش-صورتی) برگردون؛ بعد از ورود،
@@ -21,31 +22,44 @@ export default async function loginPage() {
           <h1 style="margin:0;">NetForge</h1>
         </div>
         <p class="text-dim" style="text-align:center; margin-bottom:24px;">
-          نت‌فورج — یه فضای خصوصی، فقط با دعوت.
+          ${t('نت‌فورج — یه فضای خصوصی، فقط با دعوت.', 'NetForge — a private space, invite only.')}
         </p>
 
+        <!-- سوییچ زبان همین‌جا هم هست تا قبل از ورود بشه انگلیسی کرد -->
+        <div style="text-align:center; margin-bottom:16px;">
+          <button type="button" id="login-lang-toggle" style="padding:4px 14px; font-size:12px;">
+            ${icon('globe')} ${getLang() === 'en' ? 'فارسی' : 'English'}
+          </button>
+        </div>
+
         <div class="tabs" style="margin-bottom:20px; justify-content:center; flex-wrap:wrap;">
-          <button data-mode="login" class="active" style="white-space:normal;">ورود</button>
-          <button data-mode="signup" style="white-space:normal;">ثبت‌نام با کد دعوت</button>
+          <button data-mode="login" class="active" style="white-space:normal;">${t('ورود', 'Log in')}</button>
+          <button data-mode="signup" style="white-space:normal;">${t('ثبت‌نام با کد دعوت', 'Sign up with invite code')}</button>
         </div>
 
         <form id="login-form" class="stack">
-          <input name="nickname" placeholder="نیک‌نیم" required autocomplete="username" />
-          <input name="password" type="password" placeholder="رمز عبور" required autocomplete="current-password" />
-          <button class="primary" type="submit">ورود</button>
+          <input name="nickname" placeholder="${t('نیک‌نیم', 'Nickname')}" required autocomplete="username" />
+          <input name="password" type="password" placeholder="${t('رمز عبور', 'Password')}" required autocomplete="current-password" />
+          <button class="primary" type="submit">${t('ورود', 'Log in')}</button>
         </form>
 
         <form id="signup-form" class="stack" style="display:none;">
-          <input name="inviteCode" placeholder="کد دعوت" required />
-          <input name="nickname" placeholder="نیک‌نیم (یکتا)" required minlength="2" maxlength="24" />
-          <input name="password" type="password" placeholder="رمز عبور (حداقل ۶ کاراکتر)" required minlength="6" />
-          <button class="primary" type="submit">ساخت حساب</button>
+          <input name="inviteCode" placeholder="${t('کد دعوت', 'Invite code')}" required />
+          <input name="nickname" placeholder="${t('نیک‌نیم (یکتا)', 'Nickname (unique)')}" required minlength="2" maxlength="24" />
+          <input name="password" type="password" placeholder="${t('رمز عبور (حداقل ۶ کاراکتر)', 'Password (min 6 chars)')}" required minlength="6" />
+          <button class="primary" type="submit">${t('ساخت حساب', 'Create account')}</button>
         </form>
       </div>
     </div>
   `
 
   function mount(app) {
+    // سوییچ زبان از صفحه‌ی ورود
+    app.querySelector('#login-lang-toggle')?.addEventListener('click', () => {
+      setLang(getLang() === 'en' ? 'fa' : 'en')
+      location.reload()
+    })
+
     const loginTab = app.querySelector('[data-mode="login"]')
     const signupTab = app.querySelector('[data-mode="signup"]')
     const loginForm = app.querySelector('#login-form')

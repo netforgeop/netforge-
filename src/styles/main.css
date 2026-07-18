@@ -228,7 +228,8 @@ html, body {
 body {
   font-size: 14px;
   line-height: 1.5;
-  direction: rtl;
+  /* جهت از <html> ارث می‌رسه — با سوییچ زبان (i18n) خودکار rtl/ltr می‌شه */
+  direction: inherit;
 }
 
 /* وقتی بین حالت روز/شب سوییچ می‌کنیم، رنگ سطوح اصلی نرم تغییر کنه */
@@ -403,7 +404,8 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   .topnav {
     position: fixed;
     top: 0;
-    right: 0;
+    /* شروعِ inline: فارسی=راست، انگلیسی=چپ */
+    inset-inline-start: 0;
     bottom: 0;
     width: 260px;
     height: 100vh;
@@ -411,8 +413,10 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
     flex-direction: column;
     align-items: flex-start;
     justify-content: space-between;
+    border-left: none;
     border-right: none;
-    border-left: 1px solid var(--glass-border);
+    /* خط جداکننده سمتِ محتوا */
+    border-inline-end: 1px solid var(--glass-border);
     padding: 24px 16px;
     background: var(--bg-soft);
     z-index: 100;
@@ -455,7 +459,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   }
   .topnav .tabs button {
     width: 100%;
-    text-align: right;
+    text-align: start;
     padding: 11px 14px;
     background: transparent;
     border: none;
@@ -659,7 +663,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 }
 .bold-username {
   font-weight: 700;
-  margin-left: 6px;
+  margin-inline-end: 6px;
 }
 .post-comments-section {
   padding: 0 18px 14px;
@@ -907,7 +911,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .msg.mine {
   flex-direction: row-reverse;
 }
-.msg.mine .msg-body { text-align: left; }
+.msg.mine .msg-body { text-align: end; }
 .msg.mine .bubble {
   border-color: transparent;
   background: var(--gradient);
@@ -944,7 +948,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .moderation-card { border-color: var(--danger); }
 .badge.danger-badge { background: var(--danger); color: #fff; border-color: transparent; }
 .sanction-banner {
-  border-right: 4px solid var(--danger);
+  border-inline-start: 4px solid var(--danger);
   font-size: 14px;
 }
 

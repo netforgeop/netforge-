@@ -2,9 +2,11 @@ import './styles/main.css'
 import { initRouter, route, setNotFound } from './lib/router.js'
 import { supabase } from './lib/supabaseClient.js'
 import { initMode } from './lib/appearance.js'
+import { applyLangDir } from './lib/i18n.js'
 
-// حالت روز/شب ذخیره‌شده رو همون اول کار اعمال کن (قبل از رندر صفحات)
+// حالت روز/شب و جهت زبان ذخیره‌شده رو همون اول کار اعمال کن (قبل از رندر صفحات)
 initMode()
+applyLangDir()
 
 import loginPage from './pages/login.js'
 import feedPage from './pages/feed.js'

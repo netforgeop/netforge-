@@ -3,6 +3,7 @@ import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from './navbar.js'
 import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { isStaff, softDeleteMessage } from '../lib/moderation.js'
+import { t } from '../lib/i18n.js'
 
 // یه رفرنس ماژول-سطح به کانال چت فعال؛ قبل از باز کردن کانال جدید
 // (مثلاً وقتی کاربر بین چت‌های مختلف جابه‌جا می‌شه) این رو می‌بندیم تا
@@ -14,10 +15,10 @@ export function chatMarkup() {
     <div class="glass" style="padding:14px;">
       <div class="chat-scroll" id="chat-scroll"></div>
       <form id="chat-form" class="chat-input-row">
-        <input id="chat-input" placeholder="پیام بنویس... (Enter = ارسال)" autocomplete="off" />
-        <button type="button" id="chat-attach-toggle" title="پیوست" style="padding:6px 10px;">${icon('paperclip')}</button>
-        <input id="chat-attachment" placeholder="لینک فایل..." style="max-width:150px; display:none;" />
-        <button type="submit" class="primary">ارسال</button>
+        <input id="chat-input" placeholder="${t('پیام بنویس... (Enter = ارسال)', 'Type a message... (Enter = send)')}" autocomplete="off" />
+        <button type="button" id="chat-attach-toggle" title="${t('پیوست', 'Attachment')}" style="padding:6px 10px;">${icon('paperclip')}</button>
+        <input id="chat-attachment" placeholder="${t('لینک فایل...', 'File URL...')}" style="max-width:150px; display:none;" />
+        <button type="submit" class="primary">${t('ارسال', 'Send')}</button>
       </form>
     </div>
   `
@@ -39,7 +40,7 @@ export async function mountChat(app, { targetType, targetId, me }) {
   // ── اجرای محدودیت در سمت کلاینت: میوت/تایم‌اوت/بن = فرم غیرفعال ──
   // (اجرا در سطح دیتابیس هم با RLS انجام می‌شه؛ این فقط برای UX بهتره)
   if (me.activeSanction && ['mute', 'timeout', 'ban'].includes(me.activeSanction.type)) {
-    form.innerHTML = `<div class="text-dim" style="text-align:center; padding:8px;">${icon('volume-xmark')} به خاطر محدودیت فعال نمی‌توانید پیام بفرستید.</div>`
+    form.innerHTML = `<div class="text-dim" style="text-align:center; padding:8px;">${icon('volume-xmark')} ${t('به خاطر محدودیت فعال نمی‌توانید پیام بفرستید.', "You can't send messages due to an active restriction.")}</div>`
     // لیست پیام‌ها همچنان لود می‌شه تا کاربر بتونه چت رو ببینه (مگر بن باشه که shell جلوش رو می‌گیره)
   }
 
@@ -74,7 +75,7 @@ export async function mountChat(app, { targetType, targetId, me }) {
     const visible = (data || []).filter(m => !blockedIds.has(m.sender_id))
     scrollEl.innerHTML = visible.length
       ? visible.map(renderMessage).join('')
-      : `<div class="empty-state" style="padding:30px;">هنوز پیامی نیست. اولین پیام رو تو بفرست</div>`
+      : `<div class="empty-state" style="padding:30px;">${t('هنوز پیامی نیست. اولین پیام رو تو بفرست', 'No messages yet — send the first one!')}</div>`
     bindDeleteButtons()
     if (wasNearBottom) scrollEl.scrollTop = scrollEl.scrollHeight
   }
@@ -82,7 +83,7 @@ export async function mountChat(app, { targetType, targetId, me }) {
   function renderMessage(m) {
     const u = m.sender || {}
     if (m.is_deleted) {
-      return `<div class="msg deleted"><div class="bubble">${icon('trash-can')} پیام حذف شد</div></div>`
+      return `<div class="msg deleted"><div class="bubble">${icon('trash-can')} ${t('پیام حذف شد', 'Message deleted')}</div></div>`
     }
     const isMine = m.sender_id === me.id
     // دکمه حذف: فقط برای پیام خودم یا ادمین/ناظم
@@ -97,7 +98,7 @@ export async function mountChat(app, { targetType, targetId, me }) {
           </div>
           <div class="bubble">
             ${m.content ? escapeHtml(m.content) : ''}
-            ${m.attachment_url ? `<div><a href="${escapeHtml(m.attachment_url)}" target="_blank" rel="noopener">${icon('paperclip')} پیوست</a></div>` : ''}
+            ${m.attachment_url ? `<div><a href="${escapeHtml(m.attachment_url)}" target="_blank" rel="noopener">${icon('paperclip')} ${t('پیوست', 'Attachment')}</a></div>` : ''}
           </div>
         </div>
       </div>
@@ -107,7 +108,7 @@ export async function mountChat(app, { targetType, targetId, me }) {
   function bindDeleteButtons() {
     scrollEl.querySelectorAll('.msg-delete-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('پیام حذف بشه؟')) return
+        if (!confirm(t('پیام حذف بشه؟', 'Delete this message?'))) return
         try {
           await softDeleteMessage(btn.dataset.id)
         } catch (err) { toast(err.message, { error: true }) }
@@ -130,9 +131,9 @@ export async function mountChat(app, { targetType, targetId, me }) {
     if (error) {
       // خطای RLS برای کاربر میوت‌شده رو فارسی و قابل‌فهم نشون بده
       if (me.activeSanction) {
-        toast('به خاطر محدودیت فعال نمی‌توانید پیام بفرستید.', { error: true })
+        toast(t('به خاطر محدودیت فعال نمی‌توانید پیام بفرستید.', "You can't send messages due to an active restriction."), { error: true })
       } else if (String(error.message || '').includes('row-level security')) {
-        toast('فقط اعضا می‌تونن پیام بفرستن', { error: true })
+        toast(t('فقط اعضا می‌تونن پیام بفرستن', 'Only members can send messages'), { error: true })
       } else {
         toast(error.message, { error: true })
       }

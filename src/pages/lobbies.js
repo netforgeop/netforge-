@@ -4,8 +4,12 @@ import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
 import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { isStaff } from '../lib/moderation.js'
+import { t } from '../lib/i18n.js'
 
 const STATUS_LABEL = { open: 'باز', full: 'پر', closed: 'بسته' }
+function statusLabel(status) {
+  return t({ open: 'باز', full: 'پر', closed: 'بسته' }[status || 'open'] || 'باز', { open: 'Open', full: 'Full', closed: 'Closed' }[status || 'open'] || 'Open')
+}
 const LOBBY_REACTIONS = ['👍', '🔥', '😂']
 const LOBBY_REACTION_ICONS = { '👍': 'thumbs-up', '🔥': 'fire', '😂': 'face-laugh-squint' }
 
@@ -14,13 +18,15 @@ let lobbiesChannel = null
 
 export default async function lobbiesPage() {
   return withShell('lobbies', async (profile) => {
-    const { data: lobbies, error } = await supabase
+    // نکته: .neq('status','closed') عمداً نیست! ردیف‌هایی با status=NULL (لابی‌های
+    // قدیمی/جدید بدون دیفالت) با فیلتر SQL حذف می‌شدن؛ این‌جا سمت کلاینت فیلتر می‌کنیم
+    const { data: allLobbies, error } = await supabase
       .from('game_lobbies')
       .select('*, users!game_lobbies_host_id_fkey(nickname, avatar_url, neon_color), lobby_members(user_id)')
-      .neq('status', 'closed')
-      .order('last_activity_at', { ascending: false })
+      .order('last_activity_at', { ascending: false, nullsFirst: false })
 
     if (error) throw error
+    const lobbies = (allLobbies || []).filter(l => (l.status || 'open') !== 'closed')
 
     const lobbyIds = lobbies.map(l => l.id)
     const [{ data: comments }, { data: reactions }] = await Promise.all([
@@ -30,18 +36,18 @@ export default async function lobbiesPage() {
 
     const html = `
       <div class="glass card">
-        <h3>ساخت لابی جدید</h3>
+        <h3>${t('ساخت لابی جدید', 'Create a new lobby')}</h3>
         <form id="new-lobby-form" class="stack">
-          <input name="game_name" placeholder="اسم بازی" required />
-          <input name="category" placeholder="دسته‌بندی (اختیاری، مثلاً رقابتی/کژوال)" />
-          <textarea name="description" placeholder="دنبال چه کسی می‌گردی؟" rows="2"></textarea>
+          <input name="game_name" placeholder="${t('اسم بازی', 'Game name')}" required />
+          <input name="category" placeholder="${t('دسته‌بندی (اختیاری، مثلاً رقابتی/کژوال)', 'Category (optional, e.g. ranked/casual)')}" />
+          <textarea name="description" placeholder="${t('دنبال چه کسی می‌گردی؟', 'Who are you looking for?')}" rows="2"></textarea>
           <input name="capacity" type="number" min="2" max="50" value="5" />
-          <button class="primary" type="submit">ساخت لابی</button>
+          <button class="primary" type="submit">${t('ساخت لابی', 'Create lobby')}</button>
         </form>
       </div>
 
       <div id="lobbies-list">
-        ${lobbies.length ? lobbies.map(l => renderLobby(l, profile, comments, reactions)).join('') : `<div class="empty-state">هیچ لابی بازی باز نیست.</div>`}
+        ${lobbies.length ? lobbies.map(l => renderLobby(l, profile, comments, reactions)).join('') : `<div class="empty-state">${t('هیچ لابی بازی باز نیست.', 'No open game lobbies.')}</div>`}
       </div>
     `
 
@@ -67,7 +73,7 @@ function renderLobby(lobby, me, allComments, allReactions) {
           <div class="row"><b>${escapeHtml(lobby.game_name)}</b> ${lobby.category ? `<span class="badge">${escapeHtml(lobby.category)}</span>` : ''}</div>
           <p class="text-dim" style="margin:6px 0;">${escapeHtml(lobby.description || '')}</p>
           <span class="text-dim" style="font-size:12px;">
-            میزبان: ${escapeHtml(host.nickname)} · ${members.length}/${lobby.capacity} نفر · ${STATUS_LABEL[lobby.status]} · ${timeAgo(lobby.last_activity_at)}
+            ${t('میزبان', 'Host')}: ${escapeHtml(host.nickname)} · ${members.length}/${lobby.capacity} · ${statusLabel(lobby.status)} · ${timeAgo(lobby.last_activity_at)}
           </span>
         </div>
         <div>${lobbyActionBtn(lobby, isMember, isFull)}</div>
@@ -85,24 +91,24 @@ function renderLobby(lobby, me, allComments, allReactions) {
         ${lobbyComments.map(c => lobbyCommentRowHtml(c, me)).join('')}
       </div>
       <form class="lobby-comment-form row" style="margin-top:8px;">
-        <input placeholder="کامنت بذار..." />
-        <button type="submit">ارسال</button>
+        <input placeholder="${t('کامنت بذار...', 'Add a comment...')}" />
+        <button type="submit">${t('ارسال', 'Send')}</button>
       </form>
     </div>
   `
 }
 
 function lobbyActionBtn(lobby, isMember, isFull) {
-  if (isMember) return `<a href="#/lobbies/${lobby.id}"><button class="primary">ورود به چت</button></a>`
-  if (isFull) return `<button disabled>ظرفیت پره</button>`
-  return `<button class="join-lobby-btn" data-join-lobby-id="${lobby.id}">پیوستن</button>`
+  if (isMember) return `<a href="#/lobbies/${lobby.id}"><button class="primary">${t('ورود به چت', 'Enter chat')}</button></a>`
+  if (isFull) return `<button disabled>${t('ظرفیت پره', 'Full')}</button>`
+  return `<button class="join-lobby-btn" data-join-lobby-id="${lobby.id}">${t('پیوستن', 'Join')}</button>`
 }
 
 function lobbyCommentRowHtml(c, me) {
   return `
     <div class="row between" data-comment-id="${c.id}">
       <span><b>${escapeHtml(c.author?.nickname)}</b>: ${escapeHtml(c.content)}</span>
-      ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-lobby-comment-btn" data-id="${c.id}" title="حذف کامنت" style="background:transparent;border:none;color:var(--danger);padding:0 6px;font-size:11px;opacity:.55;">${icon('xmark')}</button>` : ''}
+      ${(c.author_id === me.id || isStaff(me)) ? `<button class="delete-lobby-comment-btn" data-id="${c.id}" title="${t('حذف کامنت', 'Delete comment')}" style="background:transparent;border:none;color:var(--danger);padding:0 6px;font-size:11px;opacity:.55;">${icon('xmark')}</button>` : ''}
     </div>
   `
 }
@@ -118,11 +124,11 @@ function bindLobbyCard(card, me) {
     try {
       const { error } = await supabase.from('lobby_members').insert({ lobby_id: btn.dataset.joinLobbyId, user_id: me.id })
       if (error) throw error
-      toast('به لابی پیوستی')
+      toast(t('به لابی پیوستی', 'You joined the lobby'))
       window.location.reload()
     } catch (err) {
       const msg = String(err.message || '')
-      toast(msg.includes('row-level security') ? 'نتوانستی بپیوندی — ظرفیت لابی پر شده یا بسته است' : msg, { error: true })
+      toast(msg.includes('row-level security') ? t('نتوانستی بپیوندی — ظرفیت لابی پر شده یا بسته است', "Couldn't join — lobby is full or closed") : msg, { error: true })
       btn.disabled = false
     }
   })
@@ -141,7 +147,7 @@ function bindLobbyCard(card, me) {
         updateLobbyReactionsRow(card, me)
       } catch (err) {
         const msg = String(err.message || '')
-        toast(msg.includes('row-level security') ? 'فقط اعضای لابی می‌تونن ریاکشن بذارن — اول بپیوند' : msg, { error: true })
+        toast(msg.includes('row-level security') ? t('فقط اعضای لابی می‌تونن ریاکشن بذارن — اول بپیوند', 'Only lobby members can react — join first') : msg, { error: true })
       }
     })
   })
@@ -161,7 +167,7 @@ function bindLobbyCard(card, me) {
       input.value = ''
     } catch (err) {
       const msg = String(err.message || '')
-      toast(msg.includes('row-level security') ? 'فقط اعضای لابی می‌تونن کامنت بذارن — اول بپیوند' : msg, { error: true })
+      toast(msg.includes('row-level security') ? t('فقط اعضای لابی می‌تونن کامنت بذارن — اول بپیوند', 'Only lobby members can comment — join first') : msg, { error: true })
     }
   })
 }
@@ -171,11 +177,11 @@ function bindLobbyCommentDeleteButtons(scope) {
     if (btn.dataset.bound) return
     btn.dataset.bound = '1'
     btn.addEventListener('click', async () => {
-      if (!confirm('کامنت حذف بشه؟')) return
+      if (!confirm(t('کامنت حذف بشه؟', 'Delete this comment?'))) return
       try {
         const { error } = await supabase.from('lobby_comments').delete().eq('id', btn.dataset.id)
         if (error) throw error
-        toast('کامنت حذف شد')
+        toast(t('کامنت حذف شد', 'Comment deleted'))
         btn.closest('[data-comment-id]')?.remove()
       } catch (err) { toast(err.message, { error: true }) }
     })
@@ -212,10 +218,11 @@ function mountLobbies(app, me) {
           category: fd.get('category')?.trim() || null,
           description: fd.get('description')?.trim() || null,
           capacity: Number(fd.get('capacity')) || 5,
-          host_id: me.id
+          host_id: me.id,
+          status: 'open'
         })
         if (error) throw error
-        toast('لابی ساخته شد')
+        toast(t('لابی ساخته شد', 'Lobby created'))
         window.location.reload()
       } catch (err) {
         toast(err.message, { error: true })

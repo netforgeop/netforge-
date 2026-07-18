@@ -10,12 +10,12 @@ let docClickHandler = null
 
 export function renderTopnav(profile, activeTab) {
   const tabs = [
-    { key: 'feed', label: 'Home', icon: '🏠' },
-    { key: 'new-post', label: 'New Post', icon: '➕' },
-    { key: 'groups', label: 'Groups', icon: '👥' },
-    { key: 'lobbies', label: 'Games', icon: '🎮' }
+    { key: 'feed', label: 'خانه', icon: '🏠' },
+    { key: 'new-post', label: 'پست جدید', icon: '➕' },
+    { key: 'groups', label: 'گروه‌ها', icon: '👥' },
+    { key: 'lobbies', label: 'بازی‌ها', icon: '🎮' }
   ]
-  if (profile.role === 'admin') tabs.push({ key: 'admin', label: 'Admin Panel', icon: '🛡️' })
+  if (profile.role === 'admin') tabs.push({ key: 'admin', label: 'پنل مدیریت', icon: '🛡️' })
 
   const roleBadge = profile.role === 'admin'
     ? '<span class="badge admin">Admin</span>'

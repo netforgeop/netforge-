@@ -51,7 +51,11 @@ export async function applySanction(me, { userId, type, minutes = null, reason =
     is_active: true,
     expires_at: minutes ? new Date(Date.now() + minutes * 60_000).toISOString() : null
   }
-  const { error } = await supabase.from('user_sanctions').insert(row)
+  let { error } = await supabase.from('user_sanctions').insert(row)
+  // سازگاری با اسکیمای قدیمی: اگر جدول ستون issued_by اجباری دارد، با آن هم retry کن
+  if (error && /issued_by/i.test(error.message || '')) {
+    ;({ error } = await supabase.from('user_sanctions').insert({ ...row, issued_by: me.id }))
+  }
   if (error) throw error
 }
 

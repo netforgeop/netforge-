@@ -49,6 +49,24 @@ update public.user_sanctions set id = gen_random_uuid() where id is null;
 alter table public.user_sanctions alter column is_active set default true;
 alter table public.user_sanctions alter column created_at set default timezone('utc'::text, now());
 
+-- --------------------------------------------------------------------
+-- رفع سازگاری با نام‌های قدیمی ستون‌ها (خطای issued_by)
+-- جدول قدیمیِ شما به جای created_by ستون issued_by دارد که NOT NULL است
+-- و چون کد جدید آن را نمی‌فرستد، اینسرت خطا می‌خورد. راه‌حل:
+--   · مقدار پیش‌فرض auth.uid() روی issued_by (هر inserter خودش پرش می‌کند)
+--   · دو ستون را دوطرفه با هم سینک می‌کنیم تا گزارش‌ها درست نمایش داده شوند
+-- --------------------------------------------------------------------
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema='public' and table_name='user_sanctions' and column_name='issued_by') then
+    execute 'alter table public.user_sanctions alter column issued_by drop not null';
+    execute 'alter table public.user_sanctions alter column issued_by set default auth.uid()';
+    update public.user_sanctions set created_by = issued_by where created_by is null and issued_by is not null;
+    update public.user_sanctions set issued_by = created_by where issued_by is null and created_by is not null;
+  end if;
+end $$;
+
 -- نکته مهم: رکوردهای قدیمی با is_active = NULL به‌صورت طبیعی «غیرفعال»
 -- در نظر گرفته می‌شوند (تابع has_active_sanction فقط true را قبول دارد)،
 -- پس عمداً آن‌ها را true نمی‌کنیم تا محدودیتِ منقضی‌شده‌ی احتمالی زنده نشود.

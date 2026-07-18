@@ -52,7 +52,7 @@ end $$;
 
 -- ───────── ۳) SELECT آزاد برای اعضا (شمارنده و لیست اعضا درست نشون داده بشه) ─────────
 do $$ begin
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='group_members' and polname='group_members_select_all') then
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='group_members' and policyname='group_members_select_all') then
     create policy group_members_select_all on public.group_members for select to authenticated using (true);
   end if;
 end $$;
@@ -76,8 +76,8 @@ grant execute on function public.lobby_has_capacity(uuid) to authenticated;
 
 alter table public.lobby_members enable row level security;
 do $$ declare r record; begin
-  for r in select polname from pg_policies where schemaname='public' and tablename='lobby_members' loop
-    execute format('drop policy %I on public.lobby_members', r.polname);
+  for r in select policyname from pg_policies where schemaname='public' and tablename='lobby_members' loop
+    execute format('drop policy %I on public.lobby_members', r.policyname);
   end loop;
 end $$;
 

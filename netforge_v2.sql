@@ -225,7 +225,7 @@ create trigger trg_auto_approve_invite after insert on public.invite_requests
 
 -- ۳.الف) ادمین بتونه ردیف public.users هر کسی رو آپدیت کنه (بیو/آواتار/نقش/تم/...)
 do $$ begin
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='users' and polname='users_admin_update') then
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='users' and policyname='users_admin_update') then
     create policy users_admin_update on public.users
       for update to authenticated using (public.is_admin());
   end if;
@@ -291,8 +291,8 @@ create table if not exists public.user_blocks (
 grant select, insert, delete on public.user_blocks to authenticated;
 alter table public.user_blocks enable row level security;
 do $$ declare r record; begin
-  for r in select polname from pg_policies where schemaname='public' and tablename='user_blocks' loop
-    execute format('drop policy %I on public.user_blocks', r.polname);
+  for r in select policyname from pg_policies where schemaname='public' and tablename='user_blocks' loop
+    execute format('drop policy %I on public.user_blocks', r.policyname);
   end loop;
 end $$;
 create policy user_blocks_select on public.user_blocks
@@ -306,8 +306,8 @@ create policy user_blocks_delete on public.user_blocks
 grant select, insert, delete on public.group_members to authenticated;
 alter table public.group_members enable row level security;
 do $$ declare r record; begin
-  for r in select polname from pg_policies where schemaname='public' and tablename='group_members' loop
-    execute format('drop policy %I on public.group_members', r.polname);
+  for r in select policyname from pg_policies where schemaname='public' and tablename='group_members' loop
+    execute format('drop policy %I on public.group_members', r.policyname);
   end loop;
 end $$;
 create policy group_members_select_all on public.group_members

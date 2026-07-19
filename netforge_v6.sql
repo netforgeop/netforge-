@@ -33,6 +33,7 @@ create table if not exists public.stories (
   created_at timestamptz not null default now()
 );
 create index if not exists stories_user_created_idx on public.stories (user_id, created_at desc);
+alter table public.stories add column if not exists caption text; -- توضیح روی استوری (v6.1)
 grant select, insert, delete on public.stories to authenticated;
 alter table public.stories enable row level security;
 do $$ declare r record; begin

@@ -47,7 +47,7 @@ export default async function adminPage() {
       supabase.from('invite_codes').select('*').order('created_at', { ascending: false }),
       supabase.from('invite_requests').select('*, requester:users!invite_requests_requested_by_fkey(nickname)').eq('status', 'pending').order('requested_at'),
       supabase.from('reports').select('*, reporter:users!reports_reporter_id_fkey(nickname)').eq('status', 'pending').order('created_at', { ascending: false }),
-      supabase.from('users').select('id, nickname, role, created_at, avatar_url, neon_color, is_online').order('created_at'),
+      supabase.from('users').select('id, nickname, role, created_at, avatar_url, neon_color, is_online, bio, status_text').order('created_at'),
       supabase.from('user_sanctions').select('*, target:users!user_sanctions_user_id_fkey(nickname)').eq('is_active', true).order('created_at', { ascending: false }),
       supabase.from('mod_actions').select('*, actor:users!mod_actions_actor_id_fkey(nickname), target:users!mod_actions_target_user_id_fkey(nickname)').order('created_at', { ascending: false }).limit(50),
       supabase.from('groups').select('*, creator:users!groups_created_by_fkey(nickname), group_members(count)').order('created_at', { ascending: false }),
@@ -67,12 +67,12 @@ export default async function adminPage() {
       <h2>${icon('shield-halved')} ${t('پنل ادمین', 'Admin Panel')}</h2>
 
       <div class="admin-tabs" id="admin-tabs">
-        <button data-tab="general" class="active">${icon('sliders')} ${t('مدیریت', 'General')}</button>
-        <button data-tab="users">${icon('users')} ${t('کاربران', 'Users')}</button>
-        <button data-tab="groups">${icon('users-rectangle')} ${t('گروه‌ها', 'Groups')}</button>
-        <button data-tab="lobbies">${icon('gamepad')} ${t('بازی‌ها', 'Games')}</button>
-        <button data-tab="posts">${icon('image')} ${t('پست‌ها', 'Posts')}</button>
-        <button data-tab="themes">${icon('palette')} ${t('تم‌ها', 'Themes')}</button>
+        <button data-atab="general" class="active">${icon('sliders')} ${t('مدیریت', 'General')}</button>
+        <button data-atab="users">${icon('users')} ${t('کاربران', 'Users')}</button>
+        <button data-atab="groups">${icon('users-rectangle')} ${t('گروه‌ها', 'Groups')}</button>
+        <button data-atab="lobbies">${icon('gamepad')} ${t('بازی‌ها', 'Games')}</button>
+        <button data-atab="posts">${icon('image')} ${t('پست‌ها', 'Posts')}</button>
+        <button data-atab="themes">${icon('palette')} ${t('تم‌ها', 'Themes')}</button>
       </div>
 
       <!-- ══════ تب مدیریت روزمره ══════ -->
@@ -178,6 +178,7 @@ export default async function adminPage() {
                   <span class="badge ${u.role === 'admin' ? 'admin' : u.role === 'moderator' ? 'mod' : ''}">${u.role}</span>
                 </a>
                 <div class="row admin-user-actions">
+                  ${u.role !== 'admin' ? `<button class="manage-user-btn primary" data-id="${u.id}" title="${t('ویرایش کامل حساب', 'Full account edit')}">${icon('user-gear')} ${t('مدیریت', 'Manage')}</button>` : ''}
                   <button class="warn-user-btn" data-id="${u.id}" data-nick="${escapeHtml(u.nickname)}" title="${t('اخطار (پاپ‌آپ realtime)', 'Warning (realtime popup)')}">${icon('triangle-exclamation')} ${t('اخطار', 'Warn')}</button>
                   ${u.role !== 'admin' ? `<button class="restrict-user-btn danger" data-id="${u.id}" data-nick="${escapeHtml(u.nickname)}" title="${t('محدودیت', 'Restrict')}">${icon('scale-balanced')} ${t('محدودیت', 'Restrict')}</button>` : ''}
                   ${u.role === 'member' ? `<button class="promote-btn" data-id="${u.id}">${icon('arrow-up')} ${t('ناظم', 'Mod')}</button>` : ''}
@@ -186,6 +187,40 @@ export default async function adminPage() {
               </div>
             `).join('')}
           </div>
+        </div>
+      </div>
+
+      <!-- مودال ویرایش کامل حساب (در تب کاربران) — 닉/نقش/آواتار/بیو/استاتوس/ریست رمز -->
+      <div class="modal-backdrop" id="admin-manage-modal" style="display:none;">
+        <div class="glass modal">
+          <div class="row between" style="margin-bottom:15px;">
+            <h3 id="am-title">${icon('user-gear')} ${t('ویرایش کاربر (ادمین)', 'Edit user (admin)')}</h3>
+            <button class="danger" id="close-admin-manage-modal" style="padding:4px 8px;">${icon('xmark')}</button>
+          </div>
+          <form id="admin-manage-form" class="stack">
+            <label class="text-dim">${t('نیک‌نیم (لاگین با همین انجام می‌شه)', 'Nickname (used for login)')}</label>
+            <input name="nickname" minlength="2" maxlength="24" required />
+
+            <label class="text-dim">${t('نقش', 'Role')}</label>
+            <select name="role">
+              <option value="member">${t('عضو معمولی', 'Member')}</option>
+              <option value="moderator">${t('ناظم (Moderator)', 'Moderator')}</option>
+            </select>
+
+            <label class="text-dim">${t('لینک آواتار', 'Avatar URL')}</label>
+            <input name="avatar_url" />
+
+            <label class="text-dim">${t('بیو', 'Bio')}</label>
+            <textarea name="bio" rows="2"></textarea>
+
+            <label class="text-dim">${t('استاتوس', 'Status')}</label>
+            <input name="status_text" maxlength="80" />
+
+            <label class="text-dim">${t('رمز جدید (خالی بذاری دست نمی‌خوره)', 'New password (leave empty to keep)')}</label>
+            <input name="new_password" type="password" minlength="6" placeholder="${t('حداقل ۶ کاراکتر', 'min 6 characters')}" autocomplete="new-password" />
+
+            <button class="primary" type="submit">${icon('floppy-disk')} ${t('ذخیره همه تغییرات', 'Save all changes')}</button>
+          </form>
         </div>
       </div>
 
@@ -376,9 +411,9 @@ function mountAdmin(app, profile, users, grantsByTheme) {
   // ── ورقه‌بندی تب‌ها ──
   const tabsWrap = app.querySelector('#admin-tabs')
   tabsWrap?.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-tab]')
+    const btn = e.target.closest('[data-atab]')
     if (!btn) return
-    tabsWrap.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b === btn))
+    tabsWrap.querySelectorAll('[data-atab]').forEach(b => b.classList.toggle('active', b === btn))
     app.querySelectorAll('.admin-tab-page').forEach(p => p.classList.toggle('active', p.dataset.page === btn.dataset.tab))
   })
 
@@ -513,6 +548,66 @@ function mountAdmin(app, profile, users, grantsByTheme) {
     btn.addEventListener('click', () => {
       openSanctionModal(profile, { id: btn.dataset.id, nickname: btn.dataset.nick }, () => window.location.reload())
     })
+  })
+
+  // ── مدیریت کامل حساب از داخل تب کاربران ──
+  const usersById = new Map(users.map(u => [u.id, u]))
+  const manageModal = app.querySelector('#admin-manage-modal')
+  const manageForm = app.querySelector('#admin-manage-form')
+  let manageTarget = null
+
+  app.querySelectorAll('.manage-user-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const u = usersById.get(btn.dataset.id)
+      if (!u) return
+      manageTarget = u
+      manageModal.querySelector('#am-title').innerHTML = `${icon('user-gear')} ${t(`ویرایش ${escapeHtml(u.nickname)} (ادمین)`, `Edit ${escapeHtml(u.nickname)} (admin)`)}`
+      manageForm.elements.nickname.value = u.nickname || ''
+      manageForm.elements.role.value = u.role === 'moderator' ? 'moderator' : 'member'
+      manageForm.elements.avatar_url.value = u.avatar_url || ''
+      manageForm.elements.bio.value = u.bio || ''
+      manageForm.elements.status_text.value = u.status_text || ''
+      manageForm.elements.new_password.value = ''
+      manageModal.style.display = 'flex'
+    })
+  })
+  app.querySelector('#close-admin-manage-modal')?.addEventListener('click', () => { manageModal.style.display = 'none' })
+  manageModal?.addEventListener('click', (e) => { if (e.target === manageModal) manageModal.style.display = 'none' })
+
+  manageForm?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    if (!manageTarget) return
+    const fd = new FormData(manageForm)
+    const btn = manageForm.querySelector('button[type="submit"]')
+    btn.disabled = true
+    try {
+      // ۱) نیک‌نیم (با سینک لاگین)
+      const newNick = fd.get('nickname')?.trim()
+      if (newNick && newNick !== manageTarget.nickname) {
+        const { error } = await supabase.rpc('admin_update_nickname', { p_user_id: manageTarget.id, p_new_nickname: newNick })
+        if (error) throw error
+      }
+      // ۲) فیلدهای پروفایل و نقش
+      const { error } = await supabase.from('users').update({
+        role: fd.get('role'),
+        avatar_url: fd.get('avatar_url')?.trim() || null,
+        bio: fd.get('bio')?.trim() || null,
+        status_text: fd.get('status_text')?.trim() || null
+      }).eq('id', manageTarget.id)
+      if (error) throw error
+      // ۳) ریست رمز (اختیاری)
+      const newPass = fd.get('new_password')?.trim()
+      if (newPass) {
+        const { error } = await supabase.rpc('admin_reset_password', { p_user_id: manageTarget.id, p_new_password: newPass })
+        if (error) throw error
+        toast(t('رمز کاربر ریست شد', 'Password reset'))
+      }
+      toast(t('حساب کاربر بروزرسانی شد', 'User account updated'))
+      window.location.reload()
+    } catch (err) {
+      toast(err.message, { error: true })
+      btn.disabled = false
+    }
   })
 
   app.querySelectorAll('.promote-btn').forEach(btn => {

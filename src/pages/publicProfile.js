@@ -7,6 +7,7 @@ import { isStaff, openSanctionModal, getActiveSanctionFor, liftSanction } from '
 import { applyTheme } from '../lib/appearance.js'
 import { t, dateLocale } from '../lib/i18n.js'
 import { reportBlockMarkup, attachReportBlock } from '../components/reportBlock.js'
+import { musicPlayerHtml, bindMusicPlayers } from '../components/musicPlayer.js'
 
 export default async function publicProfilePage(parts = []) {
   const targetId = parts[0] // آیدی کاربر مورد بازدید
@@ -325,14 +326,8 @@ export default async function publicProfilePage(parts = []) {
 
         ${profile.profile_music_url ? `
           <div class="glass card music-card" style="margin-top: 20px;">
-            <div class="row" style="gap:10px;">
-              <span style="font-size:20px;">${icon('music')}</span>
-              <div style="flex:1;">
-                <div class="text-dim" style="font-size:11px;">${t('موزیکِ پروفایل', 'PROFILE SOUNDTRACK')}</div>
-                <div style="font-weight:700;">${t(`آهنگ شخصی ${profile.nickname}`, `${profile.nickname}'s anthem`)}</div>
-              </div>
-            </div>
-            <audio controls src="${escapeHtml(profile.profile_music_url)}" style="width:100%; margin-top:10px;"></audio>
+            <div class="text-dim" style="font-size:11px; margin-bottom:10px;">${t('موزیکِ پروفایل', 'PROFILE SOUNDTRACK')}</div>
+            ${musicPlayerHtml(profile.profile_music_url, profile.avatar_url || defaultAvatar(profile.nickname), t(`آهنگ شخصی ${profile.nickname}`, `${profile.nickname}'s anthem`))}
           </div>
         ` : ''}
 
@@ -429,6 +424,8 @@ export default async function publicProfilePage(parts = []) {
       mount: (app) => {
         // هندلرهای Report/Block روی پروفایل بقیه
         attachReportBlock(app, myProfile)
+        // موزیک‌پلیر سفارشی (دیسک چرخنده + سیک‌بار با رنگ اکسنت)
+        bindMusicPlayers(app)
 
         // ابزارهای مدیریتی: دکمه اعمال محدودیت + رفع محدودیت
         const sanctionBtn = app.querySelector('#sanction-user-btn')

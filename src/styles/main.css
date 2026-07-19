@@ -1605,3 +1605,114 @@ html[data-theme-mode="light"] body.cards-transparent .glass-sub {
 .warning-modal { text-align: center; max-width: 380px; }
 .warning-icon { color: #f59e0b; filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.5)); }
 .warning-text { background: var(--glass-strong); border-radius: var(--radius-md); padding: 12px; font-size: 14px; line-height: 1.8; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   v6.1 — اسکرول مودال‌ها + موزیک‌پلیر کاوردار + بهبود استوری
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── مودال‌ها: اگر محتوا بلند شد، اسکرول داخلی بخورن (دیگه دکمه‌ها گم نمی‌شن) ── */
+.modal {
+  max-height: 88dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.comments-sheet { max-height: 92dvh; }
+
+/* ── موزیک‌پلیر سفارشی (رنگش از اکسنت کاربر میاد: var(--gradient) و --neon) ── */
+.nf-player {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--neon-soft), transparent 60%);
+  border: 1px solid var(--glass-border);
+}
+.nf-player-disc {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  padding: 4px;
+  background: var(--gradient);
+  box-shadow: 0 0 18px var(--neon-soft), 0 4px 14px rgba(0,0,0,0.4);
+  position: relative;
+}
+.nf-player.playing .nf-player-disc { animation: nf-disc-spin 4s linear infinite; }
+@keyframes nf-disc-spin { to { transform: rotate(360deg); } }
+.nf-disc-label {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--bg-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 22px;
+  border: 2px solid rgba(0,0,0,0.35);
+}
+.nf-disc-label img { width: 100%; height: 100%; object-fit: cover; }
+.nf-player-main { flex: 1; min-width: 0; }
+.nf-player-title {
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 8px;
+}
+.nf-player-controls { display: flex; align-items: center; gap: 10px; }
+.nf-play-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--gradient);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px var(--neon-soft);
+  transition: transform 0.12s ease;
+}
+.nf-play-btn:hover { transform: scale(1.08); }
+.nf-seek {
+  flex: 1;
+  height: 6px;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.2);
+  cursor: pointer;
+  overflow: hidden;
+}
+.nf-seek-fill {
+  height: 100%;
+  width: 0;
+  background: var(--gradient);
+  border-radius: 6px;
+  transition: width 0.15s linear;
+}
+.nf-time { font-size: 11px; color: var(--text-dim); white-space: nowrap; min-width: 68px; text-align: left; direction: ltr; }
+
+/* ── حباب کپشن روی استوری ── */
+.story-caption-bubble {
+  position: absolute;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 84%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border-radius: 14px;
+  padding: 10px 16px;
+  font-size: 15px;
+  line-height: 1.7;
+  text-align: center;
+  z-index: 3;
+  backdrop-filter: blur(6px);
+}
+@media (max-width: 640px) { .story-caption-bubble { bottom: 120px; } }

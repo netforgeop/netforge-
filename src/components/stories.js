@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
-import { uploadMediaFile } from '../lib/mediaUpload.js'
+import { uploadMediaFile, isVideoUrl } from '../lib/mediaUpload.js'
 import { t } from '../lib/i18n.js'
 
 // ════════════════════════════════════════════════════════════════════
@@ -57,13 +57,22 @@ function barHtml() {
   const mineRing = mine ? (mine.allViewed ? 'viewed' : 'unviewed') : 'none'
 
   return `
-    <div class="story-item" data-story-user="${me.id}" data-add="${mine ? '' : '1'}">
-      <div class="story-ring ${mineRing}">
+    <!-- کاشی + : همیشه برای ساخت استوری جدید -->
+    <div class="story-item" data-story-user="${me.id}" data-add="1">
+      <div class="story-ring none">
         <img class="avatar md ${neonClass(me.neon_color)}" src="${escapeHtml(myAvatar)}">
-        ${mine ? '' : `<span class="story-plus">${icon('plus')}</span>`}
+        <span class="story-plus">${icon('plus')}</span>
       </div>
-      <span class="story-name">${t('استوری من', 'My story')}</span>
+      <span class="story-name">${t('استوری جدید', 'New story')}</span>
     </div>
+    ${mine ? `
+      <div class="story-item" data-story-user="${me.id}">
+        <div class="story-ring ${mineRing}">
+          <img class="avatar md ${neonClass(me.neon_color)}" src="${escapeHtml(myAvatar)}">
+        </div>
+        <span class="story-name">${t('استوری من', 'My story')}</span>
+      </div>
+    ` : ''}
     ${others.map(g => `
       <div class="story-item" data-story-user="${g.stories[0].user_id}">
         <div class="story-ring ${g.allViewed ? 'viewed' : 'unviewed'}">
@@ -95,7 +104,7 @@ export async function initStories(root, me) {
     const item = e.target.closest('.story-item')
     if (!item) return
     if (item.dataset.storyUser === me.id && item.dataset.add === '1') {
-      pickAndUploadStory(me, refresh)
+      openStoryComposer(me, refresh)
       return
     }
     const g = st.groups.find(g => g.stories[0]?.user_id === item.dataset.storyUser)
@@ -113,25 +122,63 @@ export async function initStories(root, me) {
   }, { once: true })
 }
 
-function pickAndUploadStory(me, after) {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = 'image/*,video/*'
-  input.onchange = async () => {
-    const file = input.files?.[0]
-    if (!file) return
-    toast(t('در حال آپلود استوری...', 'Uploading story...'))
+// سازنده‌ی استوری: مثل پست — لینک عکس/ویدیو + توضیح (کپشن)؛ آپلود فایل هم به‌عنوان گزینه‌ی جایگزین
+function openStoryComposer(me, after) {
+  const wrap = document.createElement('div')
+  wrap.className = 'modal-backdrop'
+  wrap.innerHTML = `
+    <div class="glass modal" style="max-width:420px;">
+      <div class="row between" style="margin-bottom:12px;">
+        <h3>${icon('circle-plus')} ${t('استوری جدید', 'New story')}</h3>
+        <button class="danger" id="sc-close" style="padding:4px 8px;">${icon('xmark')}</button>
+      </div>
+      <div class="stack" style="gap:10px;">
+        <input id="sc-url" placeholder="${t('لینک عکس یا ویدیو رو اینجا بذار...', 'Paste image/video URL here...')}" />
+        <input id="sc-caption" placeholder="${t('توضیح روی استوری (اختیاری)', 'Text on the story (optional)')}" maxlength="120" />
+        <div class="text-dim" style="text-align:center; font-size:11px;">${t('— یا فایل از گالری —', '— or a file from gallery —')}</div>
+        <input id="sc-file" type="file" accept="image/*,video/*" style="font-size:12px;" />
+        <button class="primary" id="sc-publish">${icon('paper-plane')} ${t('انتشار استوری (۲۴ ساعته)', 'Publish story (24h)')}</button>
+      </div>
+    </div>
+  `
+  document.body.appendChild(wrap)
+  const close = () => wrap.remove()
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) close() })
+  wrap.querySelector('#sc-close').addEventListener('click', close)
+
+  wrap.querySelector('#sc-publish').addEventListener('click', async () => {
+    const urlIn = wrap.querySelector('#sc-url').value.trim()
+    const caption = wrap.querySelector('#sc-caption').value.trim() || null
+    const file = wrap.querySelector('#sc-file').files?.[0]
+    if (!urlIn && !file) {
+      toast(t('یه لینک بده یا فایل انتخاب کن', 'Paste a link or pick a file'), { error: true })
+      return
+    }
+    const btn = wrap.querySelector('#sc-publish')
+    btn.disabled = true
     try {
-      const { url, mediaType } = await uploadMediaFile(file)
-      const { error } = await supabase.from('stories').insert({ user_id: me.id, media_url: url, media_type: mediaType })
+      let mediaUrl = urlIn || null
+      let mediaType = isVideoUrl(urlIn) ? 'video' : 'image'
+      if (file && file.size) {
+        toast(t('در حال آپلود...', 'Uploading...'))
+        const up = await uploadMediaFile(file)
+        mediaUrl = up.url
+        mediaType = up.mediaType
+      }
+      // سعی با caption؛ اگر ستونش هنوز نبود (SQL اجرا نشده) بدونش
+      let { error } = await supabase.from('stories').insert({ user_id: me.id, media_url: mediaUrl, media_type: mediaType, caption })
+      if (error && /caption/i.test(error.message || '')) {
+        ;({ error } = await supabase.from('stories').insert({ user_id: me.id, media_url: mediaUrl, media_type: mediaType }))
+      }
       if (error) throw error
-      toast(t('استوری منتشر شد', 'Story published'))
+      toast(t('استوری منتشر شد — ۲۴ ساعت می‌مونه', 'Story published — lives for 24h'))
+      close()
       after?.()
     } catch (err) {
       toast(err.message, { error: true })
+      btn.disabled = false
     }
-  }
-  input.click()
+  })
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -187,6 +234,7 @@ async function openStoryViewer(group, refreshBar) {
       </div>
       <div class="story-tap-zone prev" id="story-prev"></div>
       <div class="story-tap-zone next" id="story-next"></div>
+      ${s.caption ? `<div class="story-caption-bubble">${escapeHtml(s.caption)}</div>` : ''}
     `
     wrap.querySelector('#story-close-btn').addEventListener('click', close)
     wrap.querySelector('#story-prev').addEventListener('click', prev)

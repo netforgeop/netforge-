@@ -93,7 +93,7 @@ grant select, insert, delete on public.theme_access to authenticated;
 alter table public.themes enable row level security;
 alter table public.theme_access enable row level security;
 do $$ declare r record; begin
-  for r in select policyname from pg_policies where schemaname='public' and tablename in ('themes','theme_access') loop
+  for r in select policyname, tablename from pg_policies where schemaname='public' and tablename in ('themes','theme_access') loop
     execute format('drop policy %I on public.%I', r.policyname, r.tablename);
   end loop;
 end $$;

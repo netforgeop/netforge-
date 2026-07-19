@@ -1,11 +1,11 @@
 import { withShell } from '../lib/shell.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
-import { defaultAvatar } from '../components/navbar.js'
+import { defaultAvatar, openNotifications } from '../components/navbar.js'
 import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { isStaff, openSanctionModal, getActiveSanctionFor, liftSanction } from '../lib/moderation.js'
-import { applyTheme } from '../lib/appearance.js'
-import { t, dateLocale } from '../lib/i18n.js'
+import { applyTheme, toggleMode, getMode } from '../lib/appearance.js'
+import { t, dateLocale, toggleLang } from '../lib/i18n.js'
 import { reportBlockMarkup, attachReportBlock } from '../components/reportBlock.js'
 import { musicPlayerHtml, bindMusicPlayers } from '../components/musicPlayer.js'
 
@@ -285,6 +285,11 @@ export default async function publicProfilePage(parts = []) {
           <div class="profile-details">
             <div class="profile-username-row">
               <h2>${escapeHtml(profile.nickname)}</h2>
+              ${profile.role === 'admin'
+                ? `<span class="badge admin" title="${t('مدیر سایت', 'Site admin')}">Admin</span>`
+                : profile.role === 'moderator'
+                  ? `<span class="badge mod" title="${t('ناظم', 'Moderator')}">Mod</span>`
+                  : ''}
               ${isMe ? `
                 <button class="edit-profile-btn" id="go-edit-btn">${icon('pen-to-square')} ${t('ویرایش پروفایل', 'Edit Profile')}</button>
               ` : `
@@ -297,7 +302,14 @@ export default async function publicProfilePage(parts = []) {
                 </div>
               `}
             </div>
-            
+
+            <!-- وضعیت آنلاین/آخرین بازدید — برای همه قابل مشاهده‌است -->
+            <div class="profile-presence text-dim">
+              ${profile.is_online
+                ? `<span class="presence-dot online"></span> ${t('آنلاین', 'Online')}`
+                : `${icon('clock')} ${t('آخرین بازدید: ', 'Last seen: ')}${profile.last_seen_at ? timeAgo(profile.last_seen_at) : t('نامشخص', 'unknown')}`}
+            </div>
+ 
             <div class="profile-stats">
               <span><b>${userPosts?.length || 0}</b> ${t('پست', 'posts')}</span>
               <span><b>${followersCount}</b> ${t('دنبال‌کننده', 'followers')}</span>
@@ -311,6 +323,17 @@ export default async function publicProfilePage(parts = []) {
             </div>
           </div>
         </header>
+
+        <!-- ابزارهای حساب من: زبان/حالت/اعلان‌ها/پشتیبانی/خروج (روی موبایل این‌ها رو نوار نیستن) -->
+        ${isMe ? `
+          <div class="glass card profile-tools-row" style="margin-bottom:15px;">
+            <button id="pt-lang">${icon('globe')} ${t('زبان', 'Language')}</button>
+            <button id="pt-mode">${icon(getMode() === 'light' ? 'moon' : 'sun')} ${t('روز / شب', 'Day / Night')}</button>
+            <button id="pt-noti">${icon('bell')} ${t('اعلان‌ها', 'Notifications')}</button>
+            <a href="#/tickets"><button type="button">${icon('life-ring')} ${t('پشتیبانی', 'Support')}</button></a>
+            <button id="pt-logout" class="danger">${icon('right-from-bracket')} ${t('خروج', 'Log out')}</button>
+          </div>
+        ` : ''}
 
         ${staffSection}
 
@@ -489,6 +512,25 @@ export default async function publicProfilePage(parts = []) {
           const openBtn = app.querySelector('#go-edit-btn')
           const closeBtn = app.querySelector('#close-edit-modal')
           const form = app.querySelector('#edit-profile-form')
+
+          // ── ابزارهای ردیف پروفایل: زبان / روز-شب / اعلان‌ها / خروج ──
+          app.querySelector('#pt-lang')?.addEventListener('click', () => {
+            toggleLang()
+            location.reload()
+          })
+          app.querySelector('#pt-mode')?.addEventListener('click', (e) => {
+            const m = toggleMode()
+            e.currentTarget.innerHTML = `${icon(m === 'light' ? 'moon' : 'sun')} ${t('روز / شب', 'Day / Night')}`
+            toast(m === 'light' ? t('حالت روز فعال شد', 'Light mode on') : t('حالت شب فعال شد', 'Dark mode on'))
+          })
+          app.querySelector('#pt-noti')?.addEventListener('click', (e) => {
+            openNotifications(e.currentTarget)
+          })
+          app.querySelector('#pt-logout')?.addEventListener('click', async () => {
+            const { logOut } = await import('../lib/auth.js')
+            await logOut()
+            window.location.hash = '/login'
+          })
 
           // ── دکمه درخواست کد دعوت ──
           const reqInviteBtn = app.querySelector('#request-invite-btn')

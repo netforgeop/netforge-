@@ -60,6 +60,34 @@ function notiLink(n) {
 let notiChannel = null
 // هندلر کلیک روی document برای بستن دراپ‌داون؛ با هر رندر دوباره اضافه نشه
 let docClickHandler = null
+// تابع لود اعلان‌ها — برای باز کردن دراپ‌داون از بیرون نوار (مثل دکمه‌ی پروفایل توی موبایل)
+let notiLoader = null
+
+// باز/بسته کردن پنل اعلان‌ها نزدیک هر دکمه‌ای (پروفایل «اعلان‌ها» یا زنگوله نوار)
+export function openNotifications(anchorBtn) {
+  const dd = document.getElementById('noti-dropdown')
+  if (!dd || !anchorBtn) return
+  const margin = 10
+  const ddW = 280
+  const rect = anchorBtn.getBoundingClientRect()
+  dd.style.top = 'auto'
+  dd.style.bottom = 'auto'
+  dd.style.left = 'auto'
+  dd.style.right = 'auto'
+  let x = document.documentElement.dir === 'rtl'
+    ? window.innerWidth - rect.right - 20
+    : rect.left - ddW + rect.width + 20
+  x = Math.max(10, Math.min(x, window.innerWidth - ddW - 10))
+  dd.style.left = x + 'px'
+  if (rect.top < 280) {
+    dd.style.top = (rect.bottom + margin) + 'px'
+  } else {
+    dd.style.bottom = (window.innerHeight - rect.top + margin) + 'px'
+  }
+  const opening = dd.style.display === 'none' || !dd.style.display
+  dd.style.display = opening ? 'block' : 'none'
+  if (opening && notiLoader) notiLoader()
+}
 
 export function renderTopnav(profile, activeTab) {
   const tabs = [
@@ -67,8 +95,7 @@ export function renderTopnav(profile, activeTab) {
     { key: 'new-post', label: t('پست جدید', 'New Post'), icon: 'square-plus' },
     { key: 'reels', label: t('ریلز', 'Reels'), icon: 'clapperboard' },
     { key: 'groups', label: t('گروه‌ها', 'Groups'), icon: 'users' },
-    { key: 'lobbies', label: t('بازی‌ها', 'Games'), icon: 'gamepad' },
-    { key: 'tickets', label: t('پشتیبانی', 'Support'), icon: 'life-ring' }
+    { key: 'lobbies', label: t('بازی‌ها', 'Games'), icon: 'gamepad' }
   ]
   if (profile.role === 'admin') tabs.push({ key: 'admin', label: t('پنل مدیریت', 'Admin Panel'), icon: 'shield-halved' })
 
@@ -76,7 +103,7 @@ export function renderTopnav(profile, activeTab) {
     ? '<span class="badge admin">Admin</span>'
     : profile.role === 'moderator'
       ? '<span class="badge mod">Mod</span>'
-      : ''
+      : `<span class="badge member-badge">${t('عضو', 'Member')}</span>`
 
   return `
     <!-- سایدبار دسکتاپ سمت چپ (Discord structure) و نوار پایین گوشی (Instagram design) -->
@@ -91,26 +118,30 @@ export function renderTopnav(profile, activeTab) {
           </button>
         `).join('')}
       </div>
-      <div class="row user-control-row" style="gap: 12px;">
-        <!-- دکمه تعویض زبان (fa ⇆ en) — جهت کل سایت هم باهاش عوض می‌شه -->
-        <button id="lang-toggle-btn" title="${getLang() === 'en' ? 'فارسی' : 'English'}" style="background:transparent; border:none; font-size:15px; padding:4px;">
-          ${icon('globe')} <b style="font-size:11px;">${getLang() === 'en' ? 'فا' : 'EN'}</b>
-        </button>
-        <!-- دکمه تعویض حالت روز/شب — توی حالت شب آیکون خورشید (یعنی کلیک کن بری روز) و برعکس -->
-        <button id="mode-toggle-btn" title="${t('تعویض حالت روز / شب', 'Toggle day/night')}" style="background:transparent; border:none; font-size:17px; padding:4px;">
-          ${icon(getMode() === 'light' ? 'moon' : 'sun')}
-        </button>
-        <!-- دکمه زنگوله نوتیفیکیشن‌ها -->
-        <button id="noti-bell-btn" style="background:transparent; border:none; font-size:18px; position:relative; padding:4px;">
-          ${icon('bell')}
-          <span id="noti-badge" class="presence-dot online" style="display:none; position:absolute; top:2px; left:2px; width:8px; height:8px; background:var(--danger);"></span>
-        </button>
-        ${roleBadge}
-        <a href="#/profile" title="${escapeHtml(profile.nickname)}">
+      <!-- بلوک پایین نوار: ردیف ۱ = ابزارها (زبان/حالت/اعلان) افقی · ردیف ۲ = هویت (آواتار+نام+نقش) -->
+      <div class="user-control-block">
+        <div class="row user-tools-row" style="gap: 10px;">
+          <!-- دکمه تعویض زبان (fa ⇆ en) — جهت کل سایت هم باهاش عوض می‌شه -->
+          <button id="lang-toggle-btn" title="${getLang() === 'en' ? 'فارسی' : 'English'}" style="background:transparent; border:none; font-size:15px; padding:4px;">
+            ${icon('globe')} <b style="font-size:11px;">${getLang() === 'en' ? 'فا' : 'EN'}</b>
+          </button>
+          <!-- دکمه تعویض حالت روز/شب -->
+          <button id="mode-toggle-btn" title="${t('تعویض حالت روز / شب', 'Toggle day/night')}" style="background:transparent; border:none; font-size:17px; padding:4px;">
+            ${icon(getMode() === 'light' ? 'moon' : 'sun')}
+          </button>
+          <!-- دکمه زنگوله نوتیفیکیشن‌ها -->
+          <button id="noti-bell-btn" style="background:transparent; border:none; font-size:18px; position:relative; padding:4px;">
+            ${icon('bell')}
+            <span id="noti-badge" class="presence-dot online" style="display:none; position:absolute; top:2px; left:2px; width:8px; height:8px; background:var(--danger);"></span>
+          </button>
+        </div>
+        <a href="#/profile" class="user-identity-row" title="${escapeHtml(profile.nickname)}">
           <img class="avatar sm ${neonClass(profile.neon_color)}" src="${escapeHtml(profile.avatar_url || defaultAvatar(profile.nickname))}" alt="">
+          <span class="user-identity-meta">
+            <b>${escapeHtml(profile.nickname)}</b>
+            ${roleBadge}
+          </span>
         </a>
-
-        <button id="logout-btn" class="nav-label" style="padding: 6px 10px; font-size:12px;">${icon('right-from-bracket')} ${t('خروج', 'Log out')}</button>
       </div>
     </div>
 
@@ -402,6 +433,7 @@ export function attachTopnav(root) {
       }
 
       loadNotifications()
+      notiLoader = loadNotifications // در دسترس openNotifications (دکمه‌ی پروفایل)
 
       // بستن کانال قبلی قبل از ساخت کانال جدید (درست مثل کامپوننت چت)
       if (notiChannel) {

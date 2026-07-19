@@ -47,7 +47,7 @@ export default async function adminPage() {
       supabase.from('invite_codes').select('*').order('created_at', { ascending: false }),
       supabase.from('invite_requests').select('*, requester:users!invite_requests_requested_by_fkey(nickname)').eq('status', 'pending').order('requested_at'),
       supabase.from('reports').select('*, reporter:users!reports_reporter_id_fkey(nickname)').eq('status', 'pending').order('created_at', { ascending: false }),
-      supabase.from('users').select('id, nickname, role, created_at, avatar_url, neon_color, is_online, bio, status_text').order('created_at'),
+      supabase.from('users').select('id, nickname, role, created_at, avatar_url, neon_color, is_online, last_seen_at, bio, status_text').order('created_at'),
       supabase.from('user_sanctions').select('*, target:users!user_sanctions_user_id_fkey(nickname)').eq('is_active', true).order('created_at', { ascending: false }),
       supabase.from('mod_actions').select('*, actor:users!mod_actions_actor_id_fkey(nickname), target:users!mod_actions_target_user_id_fkey(nickname)').order('created_at', { ascending: false }).limit(50),
       supabase.from('groups').select('*, creator:users!groups_created_by_fkey(nickname), group_members(count)').order('created_at', { ascending: false }),
@@ -174,7 +174,14 @@ export default async function adminPage() {
                     <img class="avatar sm ${neonClass(u.neon_color)}" src="${escapeHtml(u.avatar_url || defaultAvatar(u.nickname))}">
                     <span class="presence-dot ${u.is_online ? 'online' : ''}" style="position:absolute; bottom:0; left:0;"></span>
                   </span>
-                  <b style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(u.nickname)}</b>
+                  <span style="min-width:0;">
+                    <b style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">${escapeHtml(u.nickname)}</b>
+                    <span class="text-dim" style="font-size:11px;">
+                      ${u.is_online
+                        ? `<span style="color:var(--success);">${t('آنلاین', 'online')}</span>`
+                        : `${t('آخرین بازدید: ', 'last seen: ')}${u.last_seen_at ? timeAgo(u.last_seen_at) : t('نامشخص', 'unknown')}`}
+                    </span>
+                  </span>
                   <span class="badge ${u.role === 'admin' ? 'admin' : u.role === 'moderator' ? 'mod' : ''}">${u.role}</span>
                 </a>
                 <div class="row admin-user-actions">

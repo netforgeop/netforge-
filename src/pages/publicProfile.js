@@ -2,7 +2,7 @@ import { withShell } from '../lib/shell.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar, openNotifications } from '../components/navbar.js'
-import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
+import { escapeHtml, timeAgo, toast, icon, isOnlineNow } from '../lib/utils.js'
 import { isStaff, openSanctionModal, getActiveSanctionFor, liftSanction } from '../lib/moderation.js'
 import { applyTheme, toggleMode, getMode } from '../lib/appearance.js'
 import { t, dateLocale, toggleLang } from '../lib/i18n.js'
@@ -305,7 +305,7 @@ export default async function publicProfilePage(parts = []) {
 
             <!-- وضعیت آنلاین/آخرین بازدید — برای همه قابل مشاهده‌است -->
             <div class="profile-presence text-dim">
-              ${profile.is_online
+              ${isOnlineNow(profile)
                 ? `<span class="presence-dot online"></span> ${t('آنلاین', 'Online')}`
                 : `${icon('clock')} ${t('آخرین بازدید: ', 'Last seen: ')}${profile.last_seen_at ? timeAgo(profile.last_seen_at) : t('نامشخص', 'unknown')}`}
             </div>

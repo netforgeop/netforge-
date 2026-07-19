@@ -2,7 +2,7 @@
    و باز شدن بدون نوار مرورگر). کش: صفحه‌ی اصلی همیشه اول از شبکه (network-first)،
    فایل‌های استاتیک هش‌دار cache-first تا آپدیت‌ها گیر نکنن. */
 
-const CACHE = 'netforge-v6-2'
+const CACHE = 'netforge-v6-4'
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png']
 
 self.addEventListener('install', (e) => {

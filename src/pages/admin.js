@@ -2,7 +2,7 @@ import { withShell } from '../lib/shell.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
-import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
+import { escapeHtml, timeAgo, toast, icon, isOnlineNow } from '../lib/utils.js'
 import { liftSanction, openSanctionModal, moderatedDeletePost, askModReason, logModAction } from '../lib/moderation.js'
 import { previewTheme } from '../lib/appearance.js'
 import { uploadMediaFile } from '../lib/mediaUpload.js'
@@ -172,12 +172,12 @@ export default async function adminPage() {
                 <a href="#/profile/${u.id}" class="row" style="color:inherit; text-decoration:none; gap:10px; flex:1; min-width:0;">
                   <span class="avatar-wrap" style="position:relative;">
                     <img class="avatar sm ${neonClass(u.neon_color)}" src="${escapeHtml(u.avatar_url || defaultAvatar(u.nickname))}">
-                    <span class="presence-dot ${u.is_online ? 'online' : ''}" style="position:absolute; bottom:0; left:0;"></span>
+                    <span class="presence-dot ${isOnlineNow(u) ? 'online' : ''}" style="position:absolute; bottom:0; left:0;"></span>
                   </span>
                   <span style="min-width:0;">
                     <b style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">${escapeHtml(u.nickname)}</b>
                     <span class="text-dim" style="font-size:11px;">
-                      ${u.is_online
+                      ${isOnlineNow(u)
                         ? `<span style="color:var(--success);">${t('آنلاین', 'online')}</span>`
                         : `${t('آخرین بازدید: ', 'last seen: ')}${u.last_seen_at ? timeAgo(u.last_seen_at) : t('نامشخص', 'unknown')}`}
                     </span>

@@ -130,30 +130,30 @@ function renderPost(post, me, allRatings, allComments, allReactions, blockedIds 
         </div>
       ` : ''}
 
-      <div class="post-actions-bar row between">
-        <div class="row" style="gap:14px;">
-          ${EMOJIS.map(e => `
-            <span class="insta-emoji-btn ${myReactions.has(e) ? 'active' : ''}" data-emoji="${e}">
-              ${icon(EMOJI_ICONS[e])} <small>${reactionCounts[e] || ''}</small>
-            </span>
-          `).join('')}
-          <span class="insta-emoji-btn open-comments-btn" title="${t('نظرات', 'Comments')}">
-            ${icon('comment')} <small class="comments-count-num">${postComments.length || ''}</small>
+      <!-- ردیف ۱: ری‌اکشن‌ها + کامنت (همیشه جدا از ستاره‌ها توی سطر خودش) -->
+      <div class="post-actions-bar row" style="gap:14px;">
+        ${EMOJIS.map(e => `
+          <span class="insta-emoji-btn ${myReactions.has(e) ? 'active' : ''}" data-emoji="${e}">
+            ${icon(EMOJI_ICONS[e])} <small>${reactionCounts[e] || ''}</small>
+          </span>
+        `).join('')}
+        <span class="insta-emoji-btn open-comments-btn" title="${t('نظرات', 'Comments')}">
+          ${icon('comment')} <small class="comments-count-num">${postComments.length || ''}</small>
+        </span>
+      </div>
+
+      <!-- ردیف ۲: امتیاز ستاره‌ای — توی سطر جدا و تمام‌عرض تا با ری‌اکشن‌ها قاطی نشه -->
+      ${post.ratings_enabled ? `
+        <div class="post-rating-bar row" style="gap:4px;">
+          ${[2, 4, 6, 8, 10].map(val => {
+            const isActive = (myRating?.score || 0) >= val;
+            return `<span class="insta-star ${isActive ? 'active' : ''}" data-val="${val}">${icon('star')}</span>`;
+          }).join('')}
+          <span class="avg-score" style="margin-right:6px; font-size:12px; color:var(--text-dim);">
+            ${avgText(postRatings)}
           </span>
         </div>
-
-        ${post.ratings_enabled ? `
-          <div class="row insta-stars-container" style="gap:4px;">
-            ${[2, 4, 6, 8, 10].map(val => {
-              const isActive = (myRating?.score || 0) >= val;
-              return `<span class="insta-star ${isActive ? 'active' : ''}" data-val="${val}">${icon('star')}</span>`;
-            }).join('')}
-            <span class="avg-score" style="margin-right:6px; font-size:12px; color:var(--text-dim);">
-              ${avgText(postRatings)}
-            </span>
-          </div>
-        ` : ''}
-      </div>
+      ` : ''}
 
       ${post.caption ? `
         <div class="post-caption-section">

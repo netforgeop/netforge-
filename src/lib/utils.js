@@ -16,6 +16,16 @@ export function timeAgo(iso) {
   return t(`${Math.floor(diff / 86400)} روز پیش`, `${Math.floor(diff / 86400)}d ago`)
 }
 
+// وضعیت آنلاین: ملاک «تازگی آخرین فعالیت» است نه پرچم is_online
+// (چون گرفتن SIGNED_OUT/beforeunload — مخصوصاً روی موبایل — قابل اعتماد نیست و پرچم گیر می‌کند).
+// هر ۶۰ ثانیه heartbeat مقدار last_seen_at را تازه می‌کند؛ پس < ۲.۵ دقیقه = آنلاین.
+export function isOnlineNow(u) {
+  if (!u || !u.last_seen_at) return false
+  const ts = new Date(u.last_seen_at).getTime()
+  if (Number.isNaN(ts)) return false
+  return (Date.now() - ts) < 150_000
+}
+
 export function toast(message, { error = false, ms = 3200 } = {}) {
   const el = document.createElement('div')
   el.className = 'toast' + (error ? ' error' : '')

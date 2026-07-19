@@ -625,8 +625,14 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
   object-fit: cover;
 }
 .post-actions-bar {
-  padding: 14px 18px;
+  padding: 14px 18px 8px;
+}
+/* سطر جدا و تمام‌عرض برای امتیاز ستاره‌ای — زیر ری‌اکشن‌ها، نه کنارشون */
+.post-rating-bar {
+  padding: 0 18px 12px;
   border-bottom: 1px solid rgba(255,255,255,0.02);
+  align-items: center;
+  flex-wrap: wrap;
 }
 .insta-emoji-btn {
   cursor: pointer;
@@ -1839,9 +1845,10 @@ html[data-theme-mode="light"] .user-tools-row { border-top-color: rgba(15, 23, 4
 .user-identity-meta b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .badge.member-badge { background: rgba(148, 163, 184, 0.14); color: var(--text-dim); }
 
-/* موبایل: بلوک ابزار/هویت از نوار می‌ره (می‌شینه توی پروفایل) + نوار پایین شیشه‌ی مایع قوی‌تر */
-@media (max-width: 820px) {
-  .user-control-block { display: none; }
+/* موبایل/تبلت: نوار پایین شیشه‌ی مایع قوی‌تر + برگشتن ابزارها (پروفایل/زبان/حالت/اعلان‌ها)
+   به صورت یک «پیل» شیشه‌ای شناور دقیقاً بالای نوار پایین */
+.tools-avatar-link { display: none; } /* لینک آواتار پروفایل فقط توی پیل موبایل دیده می‌شه */
+@media (max-width: 991px) {
   .topnav {
     background:
       linear-gradient(155deg,
@@ -1854,6 +1861,44 @@ html[data-theme-mode="light"] .user-tools-row { border-top-color: rgba(15, 23, 4
     padding-bottom: env(safe-area-inset-bottom, 0);
     height: calc(58px + env(safe-area-inset-bottom, 0));
   }
+  /* بلوک ابزارها از داخل نوار پایین خارج و بالاش شناور می‌شه */
+  .user-control-block {
+    position: absolute;
+    top: calc(-62px - env(safe-area-inset-bottom, 0px));
+    left: 12px;
+    right: 12px;
+    width: auto;
+    gap: 0;
+    z-index: 102;
+  }
+  .topnav .user-tools-row {
+    border-top: none;
+    padding-top: 0;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    background:
+      linear-gradient(155deg,
+        color-mix(in srgb, var(--neon) 20%, transparent) 0%,
+        color-mix(in srgb, var(--neon) 7%, transparent) 55%,
+        transparent 90%),
+      color-mix(in srgb, var(--bg) 42%, transparent);
+    backdrop-filter: blur(26px) saturate(1.9);
+    -webkit-backdrop-filter: blur(26px) saturate(1.9);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 18px;
+    padding: 7px 14px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  }
+  html[data-theme-mode="light"] .topnav .user-tools-row {
+    border-color: rgba(15, 23, 42, 0.1);
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.16);
+  }
+  /* ردیف هویت (نام+نقش) توی موبایل لازم نیست — خود آواتار توی پیل هست */
+  .topnav .user-identity-row { display: none; }
+  .topnav .tools-avatar-link { display: inline-flex; align-items: center; }
+  /* فضای خالی ته صفحه برای نوار پایین + پیل شناور */
+  .container { padding-bottom: 150px; }
 }
 
 /* ردیف ابزارهای پروفایل (زبان/حالت/اعلان‌ها/پشتیبانی/خروج) */
@@ -1869,3 +1914,37 @@ html[data-theme-mode="light"] .user-tools-row { border-top-color: rgba(15, 23, 4
 /* وضعیت آنلاین/آخرین بازدید روی پروفایل */
 .profile-presence { display: flex; align-items: center; gap: 7px; font-size: 12px; margin-top: 4px; }
 .profile-presence .presence-dot { position: static; width: 9px; height: 9px; display: inline-block; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   v6.4 — اصلاحات موبایل: سطر کاربران ادمین دیگه توهم نمی‌ره
+   (اطلاعات کاربر یه سطر کامل + دکمه‌ها سطر بعد، دو ستونه)
+   ═══════════════════════════════════════════════════════════════════ */
+@media (max-width: 720px) {
+  .admin-user-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px;
+  }
+  .admin-user-row > a.row {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+  .admin-user-row .badge { flex-shrink: 0; }
+  .admin-user-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+  .admin-user-actions button {
+    flex: 1 1 calc(50% - 6px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+}

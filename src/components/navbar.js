@@ -121,6 +121,10 @@ export function renderTopnav(profile, activeTab) {
       <!-- بلوک پایین نوار: ردیف ۱ = ابزارها (زبان/حالت/اعلان) افقی · ردیف ۲ = هویت (آواتار+نام+نقش) -->
       <div class="user-control-block">
         <div class="row user-tools-row" style="gap: 10px;">
+          <!-- آواتار پروفایل — فقط توی پیل موبایل دیده می‌شه (دسکتاپ ردیف هویت کامل رو داره) -->
+          <a href="#/profile" class="tools-avatar-link" title="${escapeHtml(profile.nickname)}">
+            <img class="avatar sm ${neonClass(profile.neon_color)}" src="${escapeHtml(profile.avatar_url || defaultAvatar(profile.nickname))}" alt="${t('پروفایل من', 'My profile')}">
+          </a>
           <!-- دکمه تعویض زبان (fa ⇆ en) — جهت کل سایت هم باهاش عوض می‌شه -->
           <button id="lang-toggle-btn" title="${getLang() === 'en' ? 'فارسی' : 'English'}" style="background:transparent; border:none; font-size:15px; padding:4px;">
             ${icon('globe')} <b style="font-size:11px;">${getLang() === 'en' ? 'فا' : 'EN'}</b>

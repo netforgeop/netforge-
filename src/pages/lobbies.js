@@ -129,7 +129,7 @@ function bindLobbyCard(card, me) {
       const { error } = await supabase.from('lobby_members').insert({ lobby_id: btn.dataset.joinLobbyId, user_id: me.id })
       if (error) throw error
       toast(t('به لابی پیوستی', 'You joined the lobby'))
-      window.location.reload()
+      refreshLobbiesList(me)
     } catch (err) {
       const msg = String(err.message || '')
       toast(msg.includes('row-level security')
@@ -226,6 +226,26 @@ async function updateLobbyReactionsRow(card, me) {
   })
 }
 
+// تازه‌سازی کامل لیست (بدون رفرش صفحه) — جوین/لایو/تغییر ظرفیت/هاست همه زنده
+async function refreshLobbiesList(me) {
+  const list = document.getElementById('lobbies-list')
+  if (!list) return
+  const { data: allLobbies } = await supabase
+    .from('game_lobbies')
+    .select('*, users!game_lobbies_host_id_fkey(nickname, avatar_url, neon_color), lobby_members(user_id)')
+    .order('last_activity_at', { ascending: false, nullsFirst: false })
+  const lobbies = (allLobbies || []).filter(l => (l.status || 'open') !== 'closed')
+  const lobbyIds = lobbies.map(l => l.id)
+  const [{ data: comments }, { data: reactions }] = await Promise.all([
+    lobbyIds.length ? supabase.from('lobby_comments').select('*, author:users!lobby_comments_author_id_fkey(nickname, avatar_url, neon_color)').in('lobby_id', lobbyIds).order('created_at') : { data: [] },
+    lobbyIds.length ? supabase.from('lobby_reactions').select('lobby_id, user_id, emoji').in('lobby_id', lobbyIds) : { data: [] }
+  ])
+  list.innerHTML = lobbies.length
+    ? lobbies.map(l => renderLobby(l, me, comments || [], reactions || [])).join('')
+    : `<div class="empty-state">${t('هیچ لابی بازی باز نیست.', 'No open game lobbies.')}</div>`
+  list.querySelectorAll('.glass.card[data-lobby-id]').forEach(card => bindLobbyCard(card, me))
+}
+
 function mountLobbies(app, me) {
   // ساخت لابی جدید
   const form = app.querySelector('#new-lobby-form')
@@ -247,7 +267,8 @@ function mountLobbies(app, me) {
         })
         if (error) throw error
         toast(t('لابی ساخته شد', 'Lobby created'))
-        window.location.reload()
+        form.reset()
+        refreshLobbiesList(me)
       } catch (err) {
         toast(err.message, { error: true })
         btn.disabled = false
@@ -270,31 +291,10 @@ function setupLobbiesRealtime(me) {
 
   const channel = supabase.channel(`lobbies:${Date.now()}`)
 
-  // لابی جدید → بالای لیست ظاهر می‌شه
-  channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_lobbies' }, async (payload) => {
-    const id = payload.new?.id
-    if (!id || document.querySelector(`[data-lobby-id="${id}"]`)) return
-    const { data: lobby } = await supabase
-      .from('game_lobbies')
-      .select('*, users!game_lobbies_host_id_fkey(nickname, avatar_url, neon_color), lobby_members(user_id)')
-      .eq('id', id).single()
-    if (!lobby || lobby.status === 'closed') return
-    const list = document.getElementById('lobbies-list')
-    if (!list) return
-    const empty = list.querySelector('.empty-state')
-    if (empty) empty.remove()
-    const wrap = document.createElement('div')
-    wrap.innerHTML = renderLobby(lobby, me, [], [])
-    const card = wrap.firstElementChild
-    list.prepend(card)
-    bindLobbyCard(card, me)
-  })
-
-  // لابی حذف‌شده → محو
-  channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'game_lobbies' }, (payload) => {
-    const id = payload.old?.id
-    if (id) document.querySelector(`[data-lobby-id="${id}"]`)?.remove()
-  })
+  // ★ لابی: ساخت/حذف/آپدیت (وضعیت، ظرفیت، هاست...) → لیست کامل تازه می‌شه
+  channel.on('postgres_changes', { event: '*', schema: 'public', table: 'game_lobbies' }, () => refreshLobbiesList(me))
+  // ★ عضو شدن/کیک/لایو → شمارنده‌ی اعضا و دکمه‌ها زنده آپدیت می‌شن
+  channel.on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members' }, () => refreshLobbiesList(me))
 
   // کامنت جدید لابی → زیر همون کارت
   channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lobby_comments' }, async (payload) => {

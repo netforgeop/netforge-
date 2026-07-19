@@ -1,9 +1,11 @@
 import { requireAuth, getMyProfile } from './auth.js'
+import { supabase } from './supabaseClient.js'
 import { renderTopnav, attachTopnav } from '../components/navbar.js'
 import { showResponsibilityModal } from '../components/responsibilityModal.js'
 import { getMyActiveSanction, sanctionMessage } from './moderation.js'
+import { initWarningWatcher } from './warnings.js'
 import { escapeHtml, icon } from './utils.js'
-import { applyAccent } from './appearance.js'
+import { applyAccent, applyTheme } from './appearance.js'
 import { t } from './i18n.js'
 
 /**
@@ -27,6 +29,17 @@ export async function withShell(activeTab, buildContent) {
   // رنگ اصلی سایت (دکمه‌های primary، تب فعال، بج‌ها، حباب چت من) از
   // رنگ نئونی که کاربر توی پروفایلش انتخاب کرده میاد
   applyAccent(profile.neon_color)
+
+  // تم سفارشی فعال (ساخته‌ی ادمین) — اگر کاربر انتخابش کرده، روی اکسنت سوار می‌شه
+  if (profile.active_theme_id) {
+    try {
+      const { data: th } = await supabase.from('themes').select('*').eq('id', profile.active_theme_id).single()
+      if (th) applyTheme(th)
+      else await supabase.from('users').update({ active_theme_id: null }).eq('id', profile.id)
+    } catch (err) {
+      console.warn('theme apply skipped:', err.message)
+    }
+  }
 
   // چک محدودیت‌های فعال (اگه جدول sanctions هنوز ساخته نشده باشه، null برمی‌گرده و همه‌چیز مثل قبل کار می‌کنه)
   const sanction = await getMyActiveSanction(profile.id)
@@ -77,6 +90,8 @@ export async function withShell(activeTab, buildContent) {
   async function mount(app) {
     attachTopnav(app)
     await content.mount?.(app, profile)
+    // اخطارهای مدیریت: خوانده‌نشده‌ها الان، جدیدها به‌صورت realtime پاپ‌آپ می‌شن
+    initWarningWatcher(profile)
     if (!profile.has_seen_responsibility_popup) {
       showResponsibilityModal(profile.id)
     }

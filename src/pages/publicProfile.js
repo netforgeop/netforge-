@@ -4,6 +4,7 @@ import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
 import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { isStaff, openSanctionModal, getActiveSanctionFor, liftSanction } from '../lib/moderation.js'
+import { applyTheme } from '../lib/appearance.js'
 import { t, dateLocale } from '../lib/i18n.js'
 import { reportBlockMarkup, attachReportBlock } from '../components/reportBlock.js'
 
@@ -163,6 +164,39 @@ export default async function publicProfilePage(parts = []) {
       }
     }
 
+    // ── کارت «تم سایت» — تم‌های ساخته‌ی ادمین که بهم دسترسی دارم ──
+    // (عمومی‌ها + منتخب‌شده‌ها طبق RLS برمی‌گردن). انتخاب = ذخیره + اعمال فوری.
+    let themePickerCard = ''
+    if (isMe) {
+      const { data: availThemes, error: thErr } = await supabase
+        .from('themes')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (!thErr && availThemes && availThemes.length) {
+        themePickerCard = `
+          <div class="glass card" style="margin-top:15px;">
+            <h3>${icon('palette')} ${t('تم سایت', 'Site theme')}</h3>
+            <p class="text-dim" style="font-size:12px;">${t('تم‌هایی که ادمین بهت داده — کلیک کن، همون لحظه کل سایت عوض می‌شه.', 'Themes granted to you — click one and the whole site changes instantly.')}</p>
+            <div class="stack theme-picker-list" style="gap:8px;">
+              <div class="theme-pick-row ${!myProfile.active_theme_id ? 'active' : ''}" data-theme-id="">
+                <span class="theme-swatch" style="background:linear-gradient(135deg,#9333ea,#ec4899);"></span>
+                <b style="flex:1;">${t('پیش‌فرض (نئون‌های خودم)', 'Default (my neons)')}</b>
+                ${!myProfile.active_theme_id ? icon('check') : ''}
+              </div>
+              ${availThemes.map(th => `
+                <div class="theme-pick-row ${myProfile.active_theme_id === th.id ? 'active' : ''}" data-theme-id="${th.id}" data-theme='${escapeHtml(JSON.stringify({ accent: th.accent, accent2: th.accent2, card_style: th.card_style, bg_type: th.bg_type, bg_value: th.bg_value }))}'>
+                  <span class="theme-swatch" style="background:linear-gradient(135deg, ${escapeHtml(th.accent)}, ${escapeHtml(th.accent2)});"></span>
+                  <b style="flex:1;">${escapeHtml(th.name)}</b>
+                  ${th.bg_type !== 'none' ? `<span class="badge" title="${t('پس‌زمینه داره', 'has background')}">${icon(th.bg_type === 'video' ? 'video' : th.bg_type === 'image' ? 'image' : 'droplet')}</span>` : ''}
+                  ${myProfile.active_theme_id === th.id ? icon('check') : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `
+      }
+    }
+
     // نکته: رنگِ «کل سایت» (دکمه‌ها و اکسنت‌ها) از انتخابِ خودِ کاربر لاگین‌شده
     // ── کارت «اقدامات مدیریتی روی حساب من» — فقط خودِ کاربر می‌بینه ──
     let myModLogCard = ''
@@ -285,6 +319,8 @@ export default async function publicProfilePage(parts = []) {
 
         ${inviteCard}
 
+        ${themePickerCard}
+
         ${myModLogCard}
 
         ${profile.profile_music_url ? `
@@ -308,9 +344,11 @@ export default async function publicProfilePage(parts = []) {
           <div class="instagram-posts-grid">
             ${userPosts?.length ? userPosts.map(p => `
               <div class="grid-post-item" data-post-id="${p.id}">
-                ${p.media_url ? `
-                  <img src="${escapeHtml(p.media_url)}" onerror="this.src='https://placehold.co/400?text=Post'">
-                ` : `
+                ${p.media_url
+                  ? (p.media_type === 'video'
+                      ? `<video src="${escapeHtml(p.media_url)}" muted playsinline preload="metadata"></video>${p.is_reel ? `<span class="grid-reel-badge">${icon('clapperboard')}</span>` : `<span class="grid-reel-badge">${icon('play')}</span>`}`
+                      : `<img src="${escapeHtml(p.media_url)}" onerror="this.src='https://placehold.co/400?text=Post'">`)
+                  : `
                   <div class="text-post-placeholder">
                     <p>${escapeHtml(p.caption || '')}</p>
                   </div>
@@ -517,6 +555,30 @@ export default async function publicProfilePage(parts = []) {
                 // Fallback برای مرورگرهای قدیمی/بدون دسترسی کلیپ‌بورد
                 prompt(t('کد را دستی کپی کن:', 'Copy the code manually:'), btn.dataset.code)
               }
+            })
+          })
+
+          // ── انتخاب تم (اعمال فوری + ذخیره برای ورودهای بعدی) ──
+          app.querySelectorAll('.theme-pick-row').forEach(row => {
+            row.addEventListener('click', async () => {
+              const themeId = row.dataset.themeId || null
+              try {
+                const { error } = await supabase.from('users').update({ active_theme_id: themeId }).eq('id', myProfile.id)
+                if (error) throw error
+                if (themeId && row.dataset.theme) {
+                  applyTheme(JSON.parse(row.dataset.theme))
+                  myProfile.active_theme_id = themeId
+                } else {
+                  applyTheme(null)
+                  myProfile.active_theme_id = null
+                }
+                app.querySelectorAll('.theme-pick-row').forEach(r => {
+                  r.classList.toggle('active', r === row)
+                  r.querySelector('i.fa-check')?.remove()
+                })
+                row.insertAdjacentHTML('beforeend', icon('check'))
+                toast(t('تم اعمال شد', 'Theme applied'))
+              } catch (err) { toast(err.message, { error: true }) }
             })
           })
 

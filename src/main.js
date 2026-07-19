@@ -10,6 +10,7 @@ applyLangDir()
 
 import loginPage from './pages/login.js'
 import feedPage from './pages/feed.js'
+import reelsPage from './pages/reels.js'
 import groupsPage from './pages/groups.js'
 import groupDetailPage from './pages/groupDetail.js'
 import lobbiesPage from './pages/lobbies.js'
@@ -21,6 +22,7 @@ import ticketsPage from './pages/tickets.js'
 
 route('/login', loginPage)
 route('/feed', feedPage)
+route('/reels', reelsPage)
 route('/groups', (parts) => parts.length ? groupDetailPage(parts) : groupsPage())
 route('/lobbies', (parts) => parts.length ? lobbyDetailPage(parts) : lobbiesPage())
 route('/profile', (parts) => profilePage(parts)) // ارسال آرگومان‌ها به صورت مستقیم به پروفایل

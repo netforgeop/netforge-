@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabaseClient.js'
 import { escapeHtml, timeAgo, toast, icon } from '../lib/utils.js'
 import { t } from '../lib/i18n.js'
 
+// رفرنس ماژول-سطح به کانال realtime گروه‌ها
+let groupsChannel = null
+
 export default async function groupsPage() {
   return withShell('groups', async (profile) => {
     const [{ data: groups, error }, { data: myMemberships }, { data: myPendingReqs }] = await Promise.all([
@@ -35,6 +38,93 @@ export default async function groupsPage() {
     `
 
     return { html, mount: (app) => mountGroups(app, profile) }
+  })
+}
+
+// تازه‌سازی کامل لیست — همون چیزی که قبلاً با reload انجام می‌شد، حالا بدون رفرش
+async function refreshGroupsList(me) {
+  const list = document.getElementById('groups-list')
+  if (!list) return
+  const [{ data: groups }, { data: myMemberships }, { data: myPendingReqs }] = await Promise.all([
+    supabase.from('groups').select('*, group_members(count)').order('created_at', { ascending: false }),
+    supabase.from('group_members').select('group_id').eq('user_id', me.id),
+    supabase.from('group_join_requests').select('group_id').eq('user_id', me.id).eq('status', 'pending')
+  ])
+  const memberGroupIds = new Set((myMemberships || []).map(m => m.group_id))
+  const pendingGroupIds = new Set((myPendingReqs || []).map(r => r.group_id))
+  const rows = groups || []
+  list.innerHTML = rows.length
+    ? rows.map(g => renderGroup(g, memberGroupIds, pendingGroupIds)).join('')
+    : `<div class="empty-state">${t('هنوز گروهی ساخته نشده.', 'No groups yet.')}</div>`
+  bindGroupListButtons(list, me)
+}
+
+function setupGroupsRealtime(me) {
+  if (groupsChannel) {
+    supabase.removeChannel(groupsChannel)
+    groupsChannel = null
+  }
+  const channel = supabase.channel(`groups:${Date.now()}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => refreshGroupsList(me))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => refreshGroupsList(me))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'group_join_requests' }, () => refreshGroupsList(me))
+    .subscribe()
+  groupsChannel = channel
+  window.addEventListener('hashchange', () => {
+    if (groupsChannel === channel) {
+      supabase.removeChannel(channel)
+      groupsChannel = null
+    }
+  }, { once: true })
+}
+
+// دکمه‌های لیست (جوین/درخواست) — هم برای رندر اولیه هم برای refresh
+function bindGroupListButtons(root, me) {
+  // عضویت فوری (گروه عمومی)
+  root.querySelectorAll('.join-group-btn').forEach(btn => {
+    if (btn.dataset.bound) return
+    btn.dataset.bound = '1'
+    btn.addEventListener('click', async () => {
+      btn.disabled = true
+      try {
+        const { error } = await supabase.from('group_members').insert({
+          group_id: btn.dataset.groupId, user_id: me.id
+        })
+        if (error && error.code !== '23505') throw error
+        toast(t('به گروه پیوستی', 'You joined the group'))
+        refreshGroupsList(me)
+      } catch (err) {
+        toast(err.message, { error: true })
+        btn.disabled = false
+      }
+    })
+  })
+
+  // درخواست عضویت (گروه خصوصی) — سازنده گروه تأیید می‌کنه
+  root.querySelectorAll('.request-join-btn').forEach(btn => {
+    if (btn.dataset.bound) return
+    btn.dataset.bound = '1'
+    btn.addEventListener('click', async () => {
+      btn.disabled = true
+      try {
+        const { error } = await supabase.from('group_join_requests').insert({
+          group_id: btn.dataset.groupId, user_id: me.id, status: 'pending'
+        })
+        if (error) {
+          // ایندکس pendingِ یکتا جلوی تکراری‌ها رو می‌گیره
+          if (String(error.code) === '23505') {
+            toast(t('درخواستت از قبل ثبت شده — منتظر تأیید مدیر باش', 'Already requested — please wait for approval'), { error: true })
+            return
+          }
+          throw error
+        }
+        toast(t('درخواستت برای مدیر گروه فرستاده شد', 'Request sent to the group admin'))
+        refreshGroupsList(me)
+      } catch (err) {
+        toast(err.message, { error: true })
+        btn.disabled = false
+      }
+    })
   })
 }
 
@@ -90,7 +180,8 @@ function mountGroups(app, me) {
         })
         if (error) throw error
         toast(t('گروه ساخته شد', 'Group created'))
-        window.location.reload()
+        form.reset()
+        refreshGroupsList(me) // realtime هم میاد؛ این برای سرعته
       } catch (err) {
         toast(err.message, { error: true })
         btn.disabled = false
@@ -98,50 +189,6 @@ function mountGroups(app, me) {
     })
   }
 
-  // عضویت فوری (گروه عمومی)
-  app.querySelectorAll('.join-group-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      btn.disabled = true
-      try {
-        const { error } = await supabase.from('group_members').insert({
-          group_id: btn.dataset.groupId, user_id: me.id
-        })
-        if (error && error.code === '23505') {
-          window.location.reload() // از قبل عضو بود
-          return
-        }
-        if (error) throw error
-        toast(t('به گروه پیوستی', 'You joined the group'))
-        window.location.reload()
-      } catch (err) {
-        toast(err.message, { error: true })
-        btn.disabled = false
-      }
-    })
-  })
-
-  // درخواست عضویت (گروه خصوصی) — سازنده گروه تأیید می‌کنه
-  app.querySelectorAll('.request-join-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      btn.disabled = true
-      try {
-        const { error } = await supabase.from('group_join_requests').insert({
-          group_id: btn.dataset.groupId, user_id: me.id, status: 'pending'
-        })
-        if (error) {
-          // ایندکس pendingِ یکتا جلوی تکراری‌ها رو می‌گیره
-          if (String(error.code) === '23505') {
-            toast(t('درخواستت از قبل ثبت شده — منتظر تأیید مدیر باش', 'Already requested — please wait for approval'), { error: true })
-            return
-          }
-          throw error
-        }
-        toast(t('درخواستت برای مدیر گروه فرستاده شد', 'Request sent to the group admin'))
-        window.location.reload()
-      } catch (err) {
-        toast(err.message, { error: true })
-        btn.disabled = false
-      }
-    })
-  })
+  bindGroupListButtons(app, me)
+  setupGroupsRealtime(me)
 }

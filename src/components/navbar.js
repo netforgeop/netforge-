@@ -23,7 +23,8 @@ const NOTI_ICONS = {
   comment_like: 'heart',
   comment_reply: 'reply',
   ticket_new: 'life-ring',
-  ticket_reply: 'reply'
+  ticket_reply: 'reply',
+  warning: 'triangle-exclamation'
 }
 
 function notiLink(n) {
@@ -48,6 +49,7 @@ function notiLink(n) {
     case 'ticket_reply': return '#/tickets'
     case 'comment_like':
     case 'comment_reply': return '#/feed'
+    case 'warning': return window.location.hash || '#/feed' // پاپ‌آپ خودش نشونش می‌ده؛ کلیک روی نوتیف جایی نره
     default: return `#/profile/${n.sender_id}`
   }
 }
@@ -63,6 +65,7 @@ export function renderTopnav(profile, activeTab) {
   const tabs = [
     { key: 'feed', label: t('خانه', 'Home'), icon: 'house' },
     { key: 'new-post', label: t('پست جدید', 'New Post'), icon: 'square-plus' },
+    { key: 'reels', label: t('ریلز', 'Reels'), icon: 'clapperboard' },
     { key: 'groups', label: t('گروه‌ها', 'Groups'), icon: 'users' },
     { key: 'lobbies', label: t('بازی‌ها', 'Games'), icon: 'gamepad' },
     { key: 'tickets', label: t('پشتیبانی', 'Support'), icon: 'life-ring' }
@@ -140,7 +143,10 @@ export function renderTopnav(profile, activeTab) {
               <img class="avatar sm ${neonClass(profile.neon_color)}" src="${escapeHtml(profile.avatar_url || defaultAvatar(profile.nickname))}">
               <textarea name="caption" placeholder="${t('کپشن بنویس...', 'Write a caption...')}" rows="4" style="border:none; background:transparent; padding:0; resize:none; font-size:15px;" required></textarea>
             </div>
-            <div style="border-top: 1px solid var(--glass-border); padding-top:12px;">
+            <div style="border-top: 1px solid var(--glass-border); padding-top:12px;" class="stack" style="gap:8px;">
+              <label class="text-dim" style="font-size:12px;">${icon('image')} ${t('عکس یا ویدیو از گالری (اختیاری)', 'Photo or video from gallery (optional)')}</label>
+              <input name="media_file" type="file" accept="image/*,video/*" style="font-size:12px;" />
+              <div class="text-dim" style="text-align:center; font-size:11px;">${t('— یا لینک مستقیم —', '— or a direct URL —')}</div>
               <input name="media_url" placeholder="${t('لینک عکس/ویدیو رو اینجا بذار...', 'Paste image/video URL here...')}" style="background:var(--glass-strong); font-size:13px;" />
             </div>
             <label class="row" style="font-size:13px; width:auto; cursor:pointer;">
@@ -186,7 +192,8 @@ export function attachTopnav(root) {
     if (!postForm) return
     const fd = new FormData(postForm)
     const caption = fd.get('caption')?.trim()
-    const media_url = fd.get('media_url')?.trim() || null
+    const file = fd.get('media_file')
+    const urlIn = fd.get('media_url')?.trim() || null
     if (!caption) {
       toast(t('لطفاً متنی برای پست بنویسید', 'Please write a caption'), { error: true })
       return
@@ -194,12 +201,23 @@ export function attachTopnav(root) {
     submitPostBtn.disabled = true
     try {
       const { supabase } = await import('../lib/supabaseClient.js')
+      const { uploadMediaFile, isVideoUrl } = await import('../lib/mediaUpload.js')
       const { data: session } = await supabase.auth.getSession()
       const meId = session.session?.user?.id
+
+      let media_url = urlIn
+      let media_type = isVideoUrl(urlIn) ? 'video' : 'image'
+      if (file && file.size) {
+        toast(t('در حال آپلود رسانه...', 'Uploading media...'))
+        const up = await uploadMediaFile(file)
+        media_url = up.url
+        media_type = up.mediaType
+      }
 
       const { error } = await supabase.from('posts').insert({
         author_id: meId,
         media_url,
+        media_type,
         caption,
         ratings_enabled: !!fd.get('ratings_enabled')
       })

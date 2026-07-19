@@ -47,7 +47,7 @@ export default async function adminPage() {
       supabase.from('invite_codes').select('*').order('created_at', { ascending: false }),
       supabase.from('invite_requests').select('*, requester:users!invite_requests_requested_by_fkey(nickname)').eq('status', 'pending').order('requested_at'),
       supabase.from('reports').select('*, reporter:users!reports_reporter_id_fkey(nickname)').eq('status', 'pending').order('created_at', { ascending: false }),
-      supabase.from('users').select('id, nickname, role, created_at, avatar_url, neon_color, is_online, last_seen_at, bio, status_text').order('created_at'),
+      supabase.from('users').select('id, nickname, role, created_at, avatar_url, neon_color, is_online, last_seen_at, bio, status_text, custom_tag').order('created_at'),
       supabase.from('user_sanctions').select('*, target:users!user_sanctions_user_id_fkey(nickname)').eq('is_active', true).order('created_at', { ascending: false }),
       supabase.from('mod_actions').select('*, actor:users!mod_actions_actor_id_fkey(nickname), target:users!mod_actions_target_user_id_fkey(nickname)').order('created_at', { ascending: false }).limit(50),
       supabase.from('groups').select('*, creator:users!groups_created_by_fkey(nickname), group_members(count)').order('created_at', { ascending: false }),
@@ -142,7 +142,10 @@ export default async function adminPage() {
         </div>
 
         <div class="glass card">
-          <h3>${icon('clipboard-list')} ${t('لاگ سایت — اقدامات مدیریتی', 'Site log — moderation actions')}</h3>
+          <div class="row between" style="align-items:center;">
+            <h3>${icon('clipboard-list')} ${t('لاگ سایت — اقدامات مدیریتی', 'Site log — moderation actions')}</h3>
+            <button id="clear-mod-log-btn" class="danger" style="padding:4px 12px; font-size:12px;">${icon('trash-can')} ${t('پاک کردن لاگ', 'Clear log')}</button>
+          </div>
           <p class="text-dim" style="font-size:12px;">${t('هر حذف/محدودیت/اخطار این‌جا ثبت می‌شه: کی، روی کی، چرا و چه زمانی.', 'Every deletion/restriction/warning is recorded: who, on whom, why, and when.')}</p>
           ${modLog === null || modLog === undefined
             ? `<p class="text-dim">${t('جدول mod_actions هنوز ساخته نشده؛ فایل netforge_v5.sql را اجرا کنید.', 'mod_actions table missing — run netforge_v5.sql.')}</p>`
@@ -175,7 +178,9 @@ export default async function adminPage() {
                     <span class="presence-dot ${isOnlineNow(u) ? 'online' : ''}" style="position:absolute; bottom:0; left:0;"></span>
                   </span>
                   <span style="min-width:0;">
-                    <b style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">${escapeHtml(u.nickname)}</b>
+                    <b style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">${escapeHtml(u.nickname)}
+                      ${u.custom_tag ? `<span class="tag-badge" style="margin-inline-start:5px;">${icon('tag')} ${escapeHtml(u.custom_tag)}</span>` : ''}
+                    </b>
                     <span class="text-dim" style="font-size:11px;">
                       ${isOnlineNow(u)
                         ? `<span style="color:var(--success);">${t('آنلاین', 'online')}</span>`
@@ -222,6 +227,9 @@ export default async function adminPage() {
 
             <label class="text-dim">${t('استاتوس', 'Status')}</label>
             <input name="status_text" maxlength="80" />
+
+            <label class="text-dim">${t('تگ کاستوم (کنار اسم کاربر، روی پروفایلش دیده می‌شه — خالی = بدون تگ)', 'Custom tag (shown next to the name on the profile — empty = none)')}</label>
+            <input name="custom_tag" maxlength="24" placeholder="${t('مثلاً: بازیگوش حرفه‌ای', 'e.g. Pro Gamer')}" />
 
             <label class="text-dim">${t('رمز جدید (خالی بذاری دست نمی‌خوره)', 'New password (leave empty to keep)')}</label>
             <input name="new_password" type="password" minlength="6" placeholder="${t('حداقل ۶ کاراکتر', 'min 6 characters')}" autocomplete="new-password" />
@@ -499,6 +507,17 @@ function mountAdmin(app, profile, users, grantsByTheme) {
     })
   })
 
+  // ── پاک کردن کل لاگ سایت (فقط ادمین — RPC توی netforge_v7.sql) ──
+  app.querySelector('#clear-mod-log-btn')?.addEventListener('click', async () => {
+    if (!confirm(t('کل لاگ سایت برای همیشه پاک بشه؟ این کار برگشت نداره.', 'Clear the whole site log permanently? This cannot be undone.'))) return
+    try {
+      const { error } = await supabase.rpc('admin_clear_mod_log')
+      if (error) throw error
+      toast(t('لاگ سایت پاک شد', 'Site log cleared'))
+      window.location.reload()
+    } catch (err) { toast(err.message, { error: true }) }
+  })
+
   // ── تب کاربران: جستجو + اخطار + محدودیت + نقش ──
   const search = app.querySelector('#admin-user-search')
   search?.addEventListener('input', () => {
@@ -574,6 +593,7 @@ function mountAdmin(app, profile, users, grantsByTheme) {
       manageForm.elements.avatar_url.value = u.avatar_url || ''
       manageForm.elements.bio.value = u.bio || ''
       manageForm.elements.status_text.value = u.status_text || ''
+      manageForm.elements.custom_tag.value = u.custom_tag || ''
       manageForm.elements.new_password.value = ''
       manageModal.style.display = 'flex'
     })
@@ -594,12 +614,13 @@ function mountAdmin(app, profile, users, grantsByTheme) {
         const { error } = await supabase.rpc('admin_update_nickname', { p_user_id: manageTarget.id, p_new_nickname: newNick })
         if (error) throw error
       }
-      // ۲) فیلدهای پروفایل و نقش
+      // ۲) فیلدهای پروفایل و نقش و تگ کاستوم
       const { error } = await supabase.from('users').update({
         role: fd.get('role'),
         avatar_url: fd.get('avatar_url')?.trim() || null,
         bio: fd.get('bio')?.trim() || null,
-        status_text: fd.get('status_text')?.trim() || null
+        status_text: fd.get('status_text')?.trim() || null,
+        custom_tag: fd.get('custom_tag')?.trim() || null
       }).eq('id', manageTarget.id)
       if (error) throw error
       // ۳) ریست رمز (اختیاری)

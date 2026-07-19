@@ -290,6 +290,7 @@ export default async function publicProfilePage(parts = []) {
                 : profile.role === 'moderator'
                   ? `<span class="badge mod" title="${t('ناظم', 'Moderator')}">Mod</span>`
                   : ''}
+              ${profile.custom_tag ? `<span class="tag-badge" title="${t('تگ', 'Tag')}">${icon('tag')} ${escapeHtml(profile.custom_tag)}</span>` : ''}
               ${isMe ? `
                 <button class="edit-profile-btn" id="go-edit-btn">${icon('pen-to-square')} ${t('ویرایش پروفایل', 'Edit Profile')}</button>
               ` : `

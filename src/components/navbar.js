@@ -2,6 +2,7 @@ import { neonClass } from '../lib/auth.js'
 import { escapeHtml, toast, icon } from '../lib/utils.js'
 import { getMode, toggleMode } from '../lib/appearance.js'
 import { t, getLang, toggleLang, dateLocale } from '../lib/i18n.js'
+import { showNativeNotif } from '../lib/nativeNotify.js'
 
 // نقشه‌ی نوع اعلان → آیکون و مقصد کلیک
 const NOTI_ICONS = {
@@ -153,7 +154,10 @@ export function renderTopnav(profile, activeTab) {
     <div id="noti-dropdown" class="glass" style="display:none; top:65px; left:20px; width:280px; max-height:360px; overflow-y:auto; padding:10px; font-size:13px; box-shadow:var(--shadow-glass);">
       <div class="row between" style="border-bottom:1px solid var(--glass-border); padding-bottom:6px; margin-bottom:8px;">
         <b>${t('اعلان‌ها', 'Notifications')}</b>
-        <button id="clear-notis-btn" style="padding:2px 6px; font-size:11px;">${t('خوانده شد', 'Mark read')}</button>
+        <div class="row" style="gap:6px;">
+          <button id="clear-notis-btn" style="padding:2px 6px; font-size:11px;">${t('خوانده شد', 'Mark read')}</button>
+          <button id="delete-notis-btn" class="danger" style="padding:2px 6px; font-size:11px;" title="${t('حذف همه‌ی اعلان‌ها', 'Delete all notifications')}">${icon('trash-can')} ${t('پاک کردن', 'Clear')}</button>
+        </div>
       </div>
       <div id="notis-list" class="stack" style="gap:8px;">
         <div class="text-dim" style="text-align:center; padding:10px;">${t('هیچ اعلانی نیست', 'No notifications yet')}</div>
@@ -295,6 +299,7 @@ export function attachTopnav(root) {
   const notisList = root.querySelector('#notis-list')
   const notiBadge = root.querySelector('#noti-badge')
   const clearBtn = root.querySelector('#clear-notis-btn')
+  const deleteBtn = root.querySelector('#delete-notis-btn')
 
   if (bellBtn && dropdown) {
     // موقعیت‌دهی دقیق دراپ‌داون کنار زنگوله (fixed = با اسکرول تکون نمی‌خوره)
@@ -393,13 +398,6 @@ export function attachTopnav(root) {
           const unread = notis.some(n => !n.is_read)
           notiBadge.style.display = unread ? 'block' : 'none'
 
-          // اگر نوتیفیکیشن خوانده نشده جدید آمد، صدای زنگوله پخش کن
-          const localStoredCount = localStorage.getItem('noti_count') || '0'
-          if (notis.length > Number(localStoredCount)) {
-            playNotiSound()
-          }
-          localStorage.setItem('noti_count', notis.length.toString())
-
           notisList.innerHTML = notis.map(n => `
             <a href="${notiLink(n)}" class="row noti-item" data-notif-id="${n.id}" style="align-items:flex-start; gap:8px; border-bottom:1px solid rgba(255,255,255,0.02); padding-bottom:6px; color:inherit; text-decoration:none; ${!n.is_read ? 'font-weight:bold; color:var(--neon);' : ''}">
               <img class="avatar sm" src="${escapeHtml(n.sender?.avatar_url || defaultAvatar(n.sender?.nickname))}">
@@ -410,6 +408,12 @@ export function attachTopnav(root) {
                   <div class="row" style="gap:6px; margin-top:5px;">
                     <button class="follow-accept-btn" data-sender="${n.sender_id}" data-notif="${n.id}" style="padding:3px 10px; font-size:11px;">${icon('check')} ${t('قبول', 'Accept')}</button>
                     <button class="follow-decline-btn danger" data-sender="${n.sender_id}" data-notif="${n.id}" style="padding:3px 10px; font-size:11px;">${icon('xmark')} ${t('رد', 'Decline')}</button>
+                  </div>
+                ` : ''}
+                ${(n.type === 'lobby_invite' || n.type === 'group_invite') ? `
+                  <div class="row" style="gap:6px; margin-top:5px;">
+                    <button class="inv-accept-btn" data-type="${n.type}" data-target="${n.target_id}" data-notif="${n.id}" style="padding:3px 10px; font-size:11px;">${icon('check')} ${t('قبول و ورود', 'Accept & join')}</button>
+                    <button class="inv-decline-btn danger" data-notif="${n.id}" style="padding:3px 10px; font-size:11px;">${icon('xmark')} ${t('رد', 'Decline')}</button>
                   </div>
                 ` : ''}
               </div>
@@ -430,6 +434,35 @@ export function attachTopnav(root) {
               answerFollowRequest(btn.dataset.sender, btn.dataset.notif, btn.classList.contains('follow-accept-btn'))
             })
           })
+
+          // دکمه‌های قبول/رد دعوت گروه/لابی — «قبول» خودش عضوش می‌کنه و میبره داخل
+          notisList.querySelectorAll('.inv-accept-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              btn.disabled = true
+              const isLobby = btn.dataset.type === 'lobby_invite'
+              const { error } = await supabase.rpc(isLobby ? 'accept_lobby_invite' : 'accept_group_invite',
+                isLobby ? { p_lobby_id: btn.dataset.target } : { p_group_id: btn.dataset.target })
+              if (error) {
+                toast(error.message, { error: true })
+                btn.disabled = false
+                return
+              }
+              await supabase.from('notifications').delete().eq('id', btn.dataset.notif)
+              toast(t('عضو شدی! خوش اومدی', 'Joined — welcome!'))
+              loadNotifications()
+              window.location.hash = isLobby ? `#/lobbies/${btn.dataset.target}` : `#/groups/${btn.dataset.target}`
+            })
+          })
+          notisList.querySelectorAll('.inv-decline-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              await supabase.from('notifications').delete().eq('id', btn.dataset.notif)
+              loadNotifications()
+            })
+          })
         } else {
           notiBadge.style.display = 'none'
           notisList.innerHTML = `<div class="text-dim" style="text-align:center; padding:10px;">${t('هیچ اعلانی نیست', 'No notifications yet')}</div>`
@@ -446,15 +479,29 @@ export function attachTopnav(root) {
       }
 
       // آپدیت زنده نوتیفیکیشن‌ها با اشتراک Supabase Realtime
+      // + صدای زنگوله برای هر اعلان جدید + بنر اعلان سیستمی (تب پنهان/مینیمایز)
       notiChannel = supabase
         .channel(`notis:${meId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${meId}` }, () => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${meId}` }, (payload) => {
+          try { playNotiSound() } catch (_) { /* قبل از اولین کلیک کاربر، مرورگر صدا رو بلاک می‌کنه */ }
+          const n = payload?.new
+          if (n) showNativeNotif('NetForge', n.message || t('اعلان جدید', 'New notification'), notiLink(n), n.id)
           loadNotifications()
         })
         .subscribe()
 
       clearBtn?.addEventListener('click', async () => {
         await supabase.from('notifications').update({ is_read: true }).eq('user_id', meId)
+        loadNotifications()
+      })
+
+      // پاک کردن همه‌ی اعلان‌ها با تأیید (پالیسی delete توی netforge_v7.sql اضافه شده)
+      deleteBtn?.addEventListener('click', async () => {
+        if (!confirm(t('همه‌ی اعلان‌ها برای همیشه پاک بشن؟', 'Delete all notifications permanently?'))) return
+        const { error } = await supabase.from('notifications').delete().eq('user_id', meId)
+        if (error) { toast(error.message, { error: true }); return }
+        toast(t('اعلان‌ها پاک شدن', 'Notifications cleared'))
+        localStorage.setItem('noti_count', '0')
         loadNotifications()
       })
     })

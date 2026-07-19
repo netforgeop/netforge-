@@ -3,18 +3,40 @@ import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
 import { chatMarkup, mountChat } from '../components/chat.js'
-import { escapeHtml, toast, icon } from '../lib/utils.js'
+import { escapeHtml, toast, icon, isOnlineNow } from '../lib/utils.js'
 import { isStaff, askModReason, logModAction } from '../lib/moderation.js'
 import { t } from '../lib/i18n.js'
+import { inviteAcceptCard } from '../lib/inviteAccept.js'
 
 export default async function groupDetailPage([groupId]) {
   return withShell('groups', async (profile) => {
     const { data: group, error } = await supabase.from('groups').select('*').eq('id', groupId).single()
-    if (error) throw new Error(t('این گروه پیدا نشد یا بهش دسترسی نداری', 'This group was not found or is not accessible.'))
+    if (error) {
+      // شاید گروه خصوصیه و کاربر دعوت‌شده است — اعلان دعوتش رو چک کن و کارت دعوت نشون بده (نه ارور!)
+      const { data: inv } = await supabase
+        .from('notifications')
+        .select('id, message')
+        .eq('user_id', profile.id)
+        .eq('type', 'group_invite')
+        .eq('target_id', groupId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (!inv) throw new Error(t('این گروه پیدا نشد یا بهش دسترسی نداری', 'This group was not found or is not accessible.'))
+      return inviteAcceptCard({
+        iconName: 'users',
+        title: t('به یه گروه خصوصی دعوت شدی!', "You're invited to a private group!"),
+        message: inv.message,
+        notifId: inv.id,
+        rpcName: 'accept_group_invite',
+        rpcParam: { p_group_id: groupId },
+        backHash: '#/groups'
+      })
+    }
 
     const { data: members } = await supabase
       .from('group_members')
-      .select('user_id, role, member:users!group_members_user_id_fkey(nickname, avatar_url, neon_color, is_online)')
+      .select('user_id, role, custom_tag, member:users!group_members_user_id_fkey(nickname, avatar_url, neon_color, is_online, last_seen_at)')
       .eq('group_id', groupId)
 
     const myMembership = members?.find(m => m.user_id === profile.id)
@@ -25,6 +47,8 @@ export default async function groupDetailPage([groupId]) {
     const isCreator = group.created_by === profile.id
     // دادن/گرفتن نقش: فقط سازنده یا مدیر پلتفرم
     const canSetRoles = isCreator || profile.role === 'admin'
+    // تگ‌گذاری روی اعضا: سازنده/مدیر گروه/ناظم یا ادمین پلتفرم
+    const canTag = isGroupAdmin || isPlatformStaff
 
     // درخواست‌های در انتظار — فقط مدیر گروه/مدیر پلتفرم می‌بینه
     let pendingRequests = []
@@ -93,12 +117,14 @@ export default async function groupDetailPage([groupId]) {
                 <a href="#/profile/${m.user_id}" class="row" style="color:inherit;">
                   <img class="avatar sm ${neonClass(m.member?.neon_color)}" src="${escapeHtml(m.member?.avatar_url || defaultAvatar(m.member?.nickname))}">
                   <span>${escapeHtml(m.member?.nickname)}</span>
-                  <span class="presence-dot ${m.member?.is_online ? 'online' : ''}"></span>
+                  <span class="presence-dot ${isOnlineNow(m.member) ? 'online' : ''}"></span>
                   ${memberRole === 'creator' ? `<span class="badge admin">${icon('crown')} ${t('سازنده', 'Creator')}</span>`
                     : memberRole === 'group_admin' ? `<span class="badge mod">${t('مدیر', 'Admin')}</span>` : ''}
+                  ${m.custom_tag ? `<span class="tag-badge">${icon('tag')} ${escapeHtml(m.custom_tag)}</span>` : ''}
                 </a>
-                ${(showKick || showRoleBtn) ? `
-                  <div class="row" style="gap:6px;">
+                ${(showKick || showRoleBtn || canTag) ? `
+                  <div class="row" style="gap:6px; flex-wrap:wrap;">
+                    ${canTag ? `<button class="tag-member-btn" data-user="${m.user_id}" data-nick="${escapeHtml(m.member?.nickname || '')}" data-current="${escapeHtml(m.custom_tag || '')}" style="padding:3px 10px; font-size:11px;" title="${t('تگ کاستوم برای این عضو', 'Custom tag for this member')}">${icon('tag')} ${t('تگ', 'Tag')}</button>` : ''}
                     ${showRoleBtn ? (m.role === 'group_admin'
                       ? `<button class="demote-group-admin-btn" data-user="${m.user_id}" style="padding:3px 10px; font-size:11px;">${icon('arrow-down')} ${t('عزل از مدیریت', 'Remove admin')}</button>`
                       : `<button class="promote-group-admin-btn" data-user="${m.user_id}" style="padding:3px 10px; font-size:11px;">${icon('arrow-up')} ${t('مدیر گروه کن', 'Make admin')}</button>`) : ''}
@@ -235,6 +261,30 @@ export default async function groupDetailPage([groupId]) {
               const { error: kickErr } = await supabase.rpc('kick_group_member', { p_group_id: groupId, p_user_id: btn.dataset.user })
               if (kickErr) throw kickErr
               toast(t('کاربر کیک شد', 'Member kicked'))
+              window.location.reload()
+            } catch (err) {
+              toast(err.message, { error: true })
+              btn.disabled = false
+            }
+          })
+        })
+
+        // ── تگ کاستوم برای اعضا (RPC توی netforge_v7.sql) ──
+        app.querySelectorAll('.tag-member-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const tag = prompt(
+              t(`تگ «${btn.dataset.nick}» رو بنویس (خالی = حذف تگ، حداکثر ۲۴ کاراکتر):`,
+                `Tag for "${btn.dataset.nick}" (empty = remove tag, max 24 chars):`),
+              btn.dataset.current || ''
+            )
+            if (tag === null) return
+            btn.disabled = true
+            try {
+              const { error } = await supabase.rpc('set_group_member_tag', {
+                p_group_id: groupId, p_user_id: btn.dataset.user, p_tag: tag.trim()
+              })
+              if (error) throw error
+              toast(tag.trim() ? t('تگ ذخیره شد', 'Tag saved') : t('تگ حذف شد', 'Tag removed'))
               window.location.reload()
             } catch (err) {
               toast(err.message, { error: true })

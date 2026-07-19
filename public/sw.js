@@ -2,7 +2,7 @@
    و باز شدن بدون نوار مرورگر). کش: صفحه‌ی اصلی همیشه اول از شبکه (network-first)،
    فایل‌های استاتیک هش‌دار cache-first تا آپدیت‌ها گیر نکنن. */
 
-const CACHE = 'netforge-v6-4'
+const CACHE = 'netforge-v7-0'
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png']
 
 self.addEventListener('install', (e) => {
@@ -55,4 +55,24 @@ self.addEventListener('fetch', (e) => {
       })
     })
   )
+})
+
+// کلیک روی بنر اعلان سیستمی → فوکوس روی تب باز (یا باز کردن تب جدید) + رفتن به مقصد
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  const url = (e.notification.data && e.notification.data.url) || self.registration.scope
+  e.waitUntil((async () => {
+    try {
+      const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const existing = list.find((c) => c.url.startsWith(self.registration.scope))
+      if (existing) {
+        await existing.focus()
+        try { await existing.navigate(url) } catch (_) { /* ناوبری hash کافیه */ }
+        return
+      }
+      await self.clients.openWindow(url)
+    } catch (_) {
+      self.clients.openWindow(url)
+    }
+  })())
 })

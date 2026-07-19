@@ -1948,3 +1948,43 @@ html[data-theme-mode="light"] .user-tools-row { border-top-color: rgba(15, 23, 4
     white-space: nowrap;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   v7.0 — تگ‌های کاستوم + پاپ‌آپ مجوز اعلان سیستمی
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* تگ کاستوم — پیل گرادیانی کوچک کنار اسم */
+.tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--gradient);
+  color: #fff;
+  box-shadow: 0 3px 12px var(--neon-soft);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.tag-badge .fa-solid { font-size: 8px; }
+
+/* پاپ‌آپ شیشه‌ای گرفتن مجوز اعلان سیستمی — گوشه‌ی پایین صفحه */
+.native-notif-prompt {
+  position: fixed;
+  bottom: 96px;
+  inset-inline-end: 14px;
+  z-index: 400;
+  max-width: 300px;
+  padding: 14px;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.5);
+  animation: nnSlideUp 0.35s ease both;
+}
+@media (min-width: 992px) {
+  .native-notif-prompt { bottom: 22px; inset-inline-end: 22px; }
+}
+@keyframes nnSlideUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}

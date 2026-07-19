@@ -3,18 +3,40 @@ import { supabase } from '../lib/supabaseClient.js'
 import { neonClass } from '../lib/auth.js'
 import { defaultAvatar } from '../components/navbar.js'
 import { chatMarkup, mountChat } from '../components/chat.js'
-import { escapeHtml, toast, icon } from '../lib/utils.js'
+import { escapeHtml, toast, icon, isOnlineNow } from '../lib/utils.js'
 import { isStaff, askModReason, logModAction } from '../lib/moderation.js'
 import { t } from '../lib/i18n.js'
+import { inviteAcceptCard } from '../lib/inviteAccept.js'
 
 export default async function lobbyDetailPage([lobbyId]) {
   return withShell('lobbies', async (profile) => {
     const { data: lobby, error } = await supabase.from('game_lobbies').select('*').eq('id', lobbyId).single()
-    if (error) throw new Error(t('این لابی پیدا نشد', 'This lobby was not found'))
+    if (error) {
+      // شاید لابی خصوصیه و کاربر دعوت‌شده است — به جای «پیدا نشد» کارت دعوت نشون بده
+      const { data: inv } = await supabase
+        .from('notifications')
+        .select('id, message')
+        .eq('user_id', profile.id)
+        .eq('type', 'lobby_invite')
+        .eq('target_id', lobbyId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (!inv) throw new Error(t('این لابی پیدا نشد', 'This lobby was not found'))
+      return inviteAcceptCard({
+        iconName: 'gamepad',
+        title: t('به یه لابی خصوصی دعوت شدی!', "You're invited to a private lobby!"),
+        message: inv.message,
+        notifId: inv.id,
+        rpcName: 'accept_lobby_invite',
+        rpcParam: { p_lobby_id: lobbyId },
+        backHash: '#/lobbies'
+      })
+    }
 
     const { data: members } = await supabase
       .from('lobby_members')
-      .select('user_id, role, member:users!lobby_members_user_id_fkey(nickname, avatar_url, neon_color, is_online)')
+      .select('user_id, role, custom_tag, member:users!lobby_members_user_id_fkey(nickname, avatar_url, neon_color, is_online, last_seen_at)')
       .eq('lobby_id', lobbyId)
 
     const myMembership = (members || []).find(m => m.user_id === profile.id)
@@ -24,6 +46,7 @@ export default async function lobbyDetailPage([lobbyId]) {
     const isPlatformStaff = profile.role === 'admin' || profile.role === 'moderator'
     const canManage = isHost || isPlatformStaff // تنظیمات لابی + نقش‌ها
     const canKick = isHost || isPlatformStaff || isCoHost // کیک کردن اعضا
+    const canTag = isHost || isPlatformStaff || isCoHost // تگ‌گذاری روی اعضا
     const isFull = (members?.length || 0) >= lobby.capacity && !isMember
     const status = lobby.status || 'open'
 
@@ -58,10 +81,12 @@ export default async function lobbyDetailPage([lobbyId]) {
                   <span>${escapeHtml(m.member?.nickname)}</span>
                   ${isTargetHost ? `<span class="badge admin">${icon('crown')} ${t('میزبان', 'Host')}</span>`
                     : m.role === 'co_host' ? `<span class="badge mod">${icon('star')} ${t('کاپیتان', 'Co-host')}</span>` : ''}
-                  <span class="presence-dot ${m.member?.is_online ? 'online' : ''}"></span>
+                  ${m.custom_tag ? `<span class="tag-badge">${icon('tag')} ${escapeHtml(m.custom_tag)}</span>` : ''}
+                  <span class="presence-dot ${isOnlineNow(m.member) ? 'online' : ''}"></span>
                 </a>
-                ${(showKick || showRoleBtn) ? `
-                  <div class="row" style="gap:6px;">
+                ${(showKick || showRoleBtn || canTag) ? `
+                  <div class="row" style="gap:6px; flex-wrap:wrap;">
+                    ${canTag ? `<button class="tag-member-btn" data-user="${m.user_id}" data-nick="${escapeHtml(m.member?.nickname || '')}" data-current="${escapeHtml(m.custom_tag || '')}" style="padding:3px 10px; font-size:11px;" title="${t('تگ کاستوم برای این عضو', 'Custom tag for this member')}">${icon('tag')} ${t('تگ', 'Tag')}</button>` : ''}
                     ${showRoleBtn ? (m.role === 'co_host'
                       ? `<button class="demote-cohost-btn" data-user="${m.user_id}" style="padding:3px 10px; font-size:11px;">${icon('arrow-down')} ${t('برداشتن کاپیتان', 'Remove co-host')}</button>`
                       : `<button class="promote-cohost-btn" data-user="${m.user_id}" style="padding:3px 10px; font-size:11px;">${icon('arrow-up')} ${t('کاپیتان کن', 'Make co-host')}</button>`) : ''}
@@ -192,6 +217,30 @@ export default async function lobbyDetailPage([lobbyId]) {
               const { error: kickErr } = await supabase.rpc('kick_lobby_member', { p_lobby_id: lobbyId, p_user_id: btn.dataset.user })
               if (kickErr) throw kickErr
               toast(t('کاربر کیک شد', 'Member kicked'))
+              window.location.reload()
+            } catch (err) {
+              toast(err.message, { error: true })
+              btn.disabled = false
+            }
+          })
+        })
+
+        // ── تگ کاستوم برای اعضا (RPC توی netforge_v7.sql) ──
+        app.querySelectorAll('.tag-member-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const tag = prompt(
+              t(`تگ «${btn.dataset.nick}» رو بنویس (خالی = حذف تگ، حداکثر ۲۴ کاراکتر):`,
+                `Tag for "${btn.dataset.nick}" (empty = remove tag, max 24 chars):`),
+              btn.dataset.current || ''
+            )
+            if (tag === null) return
+            btn.disabled = true
+            try {
+              const { error } = await supabase.rpc('set_lobby_member_tag', {
+                p_lobby_id: lobbyId, p_user_id: btn.dataset.user, p_tag: tag.trim()
+              })
+              if (error) throw error
+              toast(tag.trim() ? t('تگ ذخیره شد', 'Tag saved') : t('تگ حذف شد', 'Tag removed'))
               window.location.reload()
             } catch (err) {
               toast(err.message, { error: true })

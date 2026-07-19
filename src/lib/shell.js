@@ -4,6 +4,7 @@ import { renderTopnav, attachTopnav } from '../components/navbar.js'
 import { showResponsibilityModal } from '../components/responsibilityModal.js'
 import { getMyActiveSanction, sanctionMessage } from './moderation.js'
 import { initWarningWatcher } from './warnings.js'
+import { maybeShowInstallPrompt } from './pwa.js'
 import { escapeHtml, icon } from './utils.js'
 import { applyAccent, applyTheme } from './appearance.js'
 import { t } from './i18n.js'
@@ -92,6 +93,8 @@ export async function withShell(activeTab, buildContent) {
     await content.mount?.(app, profile)
     // اخطارهای مدیریت: خوانده‌نشده‌ها الان، جدیدها به‌صورت realtime پاپ‌آپ می‌شن
     initWarningWatcher(profile)
+    // پیشنهاد نصب سایت رو صفحه‌ی اصلی (PWA) — هر چند روز یه بار
+    maybeShowInstallPrompt()
     if (!profile.has_seen_responsibility_popup) {
       showResponsibilityModal(profile.id)
     }

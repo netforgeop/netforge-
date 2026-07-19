@@ -414,7 +414,7 @@ function mountAdmin(app, profile, users, grantsByTheme) {
     const btn = e.target.closest('[data-atab]')
     if (!btn) return
     tabsWrap.querySelectorAll('[data-atab]').forEach(b => b.classList.toggle('active', b === btn))
-    app.querySelectorAll('.admin-tab-page').forEach(p => p.classList.toggle('active', p.dataset.page === btn.dataset.tab))
+    app.querySelectorAll('.admin-tab-page').forEach(p => p.classList.toggle('active', p.dataset.page === btn.dataset.atab))
   })
 
   // ── تب مدیریت: کد دعوت ──

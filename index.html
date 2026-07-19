@@ -6,6 +6,23 @@
     <title>NetForge — نت‌فورج</title>
     <meta name="description" content="نت‌فورج — فضای خصوصی دانشجویی، فقط با دعوت" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/icon-180.png" />
+    <!-- PWA: نصب سایت رو صفحه‌ی اصلی گوشی/کامپیوتر + باز شدن بدون نوار مرورگر -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="NetForge" />
+    <script>
+      // ثبت سرویس‌ورکر (قابل‌نصب شدن + کش هوشمند)
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(function () {})
+        })
+      }
+    </script>
     <!-- آیکون‌پک Font Awesome (به‌جای ایموجی‌ها در کل رابط کاربری) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script>

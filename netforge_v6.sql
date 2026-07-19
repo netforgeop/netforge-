@@ -67,6 +67,8 @@ create policy story_views_select_involved on public.story_views for select to au
 create policy story_views_insert_own on public.story_views for insert to authenticated with check (user_id = auth.uid());
 
 -- ───────── ۳) تم‌های سفارشی (ساخت ادمین، دسترسی برای همه یا منتخب) ─────────
+-- نکته: اول هر دو جدول ساخته می‌شن، بعد پالیسی‌ها — چون پالیسیِ themes به
+-- theme_access ارجاع می‌ده (ترتیب قبلی باعث ارور 42P01 شد).
 create table if not exists public.themes (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -79,12 +81,19 @@ create table if not exists public.themes (
   is_public boolean not null default false, -- true = همه دسترسی دارن
   created_at timestamptz not null default now()
 );
+create table if not exists public.theme_access (
+  theme_id uuid not null references public.themes(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  primary key (theme_id, user_id)
+);
 grant select on public.themes to authenticated;
 grant insert, update, delete on public.themes to authenticated;
+grant select, insert, delete on public.theme_access to authenticated;
 alter table public.themes enable row level security;
+alter table public.theme_access enable row level security;
 do $$ declare r record; begin
-  for r in select policyname from pg_policies where schemaname='public' and tablename='themes' loop
-    execute format('drop policy %I on public.themes', r.policyname);
+  for r in select policyname from pg_policies where schemaname='public' and tablename in ('themes','theme_access') loop
+    execute format('drop policy %I on public.%I', r.policyname, r.tablename);
   end loop;
 end $$;
 create policy themes_select_public_granted_admin on public.themes for select to authenticated
@@ -96,19 +105,6 @@ create policy themes_select_public_granted_admin on public.themes for select to 
 create policy themes_insert_admin on public.themes for insert to authenticated with check (public.is_admin());
 create policy themes_update_admin on public.themes for update to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy themes_delete_admin on public.themes for delete to authenticated using (public.is_admin());
-
-create table if not exists public.theme_access (
-  theme_id uuid not null references public.themes(id) on delete cascade,
-  user_id uuid not null references public.users(id) on delete cascade,
-  primary key (theme_id, user_id)
-);
-grant select, insert, delete on public.theme_access to authenticated;
-alter table public.theme_access enable row level security;
-do $$ declare r record; begin
-  for r in select policyname from pg_policies where schemaname='public' and tablename='theme_access' loop
-    execute format('drop policy %I on public.theme_access', r.policyname);
-  end loop;
-end $$;
 create policy theme_access_select_self_or_admin on public.theme_access for select to authenticated
   using (user_id = auth.uid() or public.is_admin());
 create policy theme_access_insert_admin on public.theme_access for insert to authenticated with check (public.is_admin());

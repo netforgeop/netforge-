@@ -45,15 +45,21 @@ begin
     ('begin;'),
     ('set session_replication_role = replica;');
 
-  -- ───────── سکوئنس‌ها (اگر باشن) ─────────
+  -- ───────── سکوئنس‌ها (اگر باشن) — سکوئنس‌های identity خودکار با خود جدول ساخته می‌شن ─────────
   for t in
     select cl.relname from pg_class cl
     where cl.relkind = 'S' and cl.relnamespace = 'public'::regnamespace
+      and not exists (
+        select 1 from pg_depend d
+        join pg_class t2 on t2.oid = d.refobjid and t2.relkind = 'r'
+        join pg_attribute a on a.attrelid = t2.oid and a.attnum = d.refobjsubid and a.attidentity <> ''
+        where d.objid = cl.oid and d.deptype = 'i'
+      )
     order by cl.relname
   loop
     execute format('select last_value from public.%I', t.relname) into lastv;
     insert into _nf_dump(line) values
-      ('do $nf$ begin create sequence public.' || quote_ident(t.relname) || '; exception when duplicate_object then null; end $nf$;'),
+      ('do $nf$ begin create sequence public.' || quote_ident(t.relname) || '; exception when duplicate_table or duplicate_object then null; end $nf$;'),
       ('select setval(' || quote_literal('public.' || t.relname) || ', ' || lastv || ');');
   end loop;
 
@@ -83,7 +89,11 @@ begin
       'create table if not exists public.' || quote_ident(t.table_name) || ' (' ||
       (select E'\n  ' || string_agg(
               quote_ident(col.column_name) || ' ' || format_type(a.atttypid, a.atttypmod) ||
-              case when col.column_default is not null then ' default ' || col.column_default else '' end ||
+              case
+                when col.is_identity = 'YES' then ' generated ' || col.identity_generation || ' as identity'
+                when col.column_default is not null then ' default ' || col.column_default
+                else ''
+              end ||
               case when col.is_nullable = 'NO' then ' not null' else '' end,
               E',\n  ' order by col.ordinal_position)
        from information_schema.columns col
@@ -102,9 +112,10 @@ begin
       order by conname
     loop
       insert into _nf_dump(line) values (
-        'do $nf$ begin alter table public.' || quote_ident(t.table_name) ||
-        ' add constraint ' || quote_ident(c.conname) || ' ' || c.def ||
-        '; exception when duplicate_object then null; end $nf$;');
+        'do $nf$ begin if not exists (select 1 from pg_constraint where conrelid = ' ||
+        quote_literal(format('public.%I', t.table_name)) || '::regclass and conname = ' ||
+        quote_literal(c.conname) || ') then alter table public.' || quote_ident(t.table_name) ||
+        ' add constraint ' || quote_ident(c.conname) || ' ' || c.def || '; end if; end $nf$;');
     end loop;
   end loop;
 
@@ -116,9 +127,11 @@ begin
     order by 2, 1
   loop
     insert into _nf_dump(line) values (
-      'do $nf$ begin alter table ' || c.rel ||
-      ' add constraint ' || quote_ident(c.conname) || ' ' || c.def ||
-      '; exception when duplicate_object then null; when undefined_object then raise notice ''fk skipped: ' || replace(c.conname, '''', ' ') || '''; end $nf$;');
+      'do $nf$ begin if not exists (select 1 from pg_constraint where conrelid = ' ||
+      quote_literal(c.rel) || '::regclass and conname = ' || quote_literal(c.conname) ||
+      ') then alter table ' || c.rel || ' add constraint ' || quote_ident(c.conname) || ' ' || c.def ||
+      '; end if; exception when undefined_table or undefined_object then raise notice ''fk skipped: ' ||
+      replace(c.conname, '''', ' ') || '''; end $nf$;');
   end loop;
 
   -- ───────── ایندکس‌های غیرکانسترینتی ─────────
@@ -161,14 +174,20 @@ begin
              'case when ' || quote_ident(column_name) || ' is null then ''null''' ||
              case when data_type in ('jsonb', 'json')
                   then ' else quote_literal(' || quote_ident(column_name) || '::text) || ''::' || udt_name || ''''
-                  else ' else quote_literal(' || quote_ident(column_name) || '::text)' end,
+                  else ' else quote_literal(' || quote_ident(column_name) || '::text)' end
+             || ' end',
              ' || '', '' || ' order by ordinal_position)
       into exprs
       from information_schema.columns
      where table_schema = 'public' and table_name = t.table_name;
 
     insert into _nf_dump(line) values (E'\n-- دیتای جدول: ' || t.table_name);
-    acc := 'insert into public.' || quote_ident(t.table_name) || ' (' || cols || ') values';
+    -- ستون identity با ALWAYS به «overriding system value» نیاز داره تا آی‌دی‌های اصلی برگردن
+    acc := 'insert into public.' || quote_ident(t.table_name) || ' (' || cols || ')' ||
+           case when exists (select 1 from information_schema.columns cx
+                             where cx.table_schema = 'public' and cx.table_name = t.table_name
+                               and cx.is_identity = 'YES' and cx.identity_generation = 'ALWAYS')
+                then ' overriding system value' else '' end || ' values';
     cnt := 0;
     total := 0;
     q := 'select ''('' || ' || exprs || ' || '')'' as tup from public.' || quote_ident(t.table_name);
@@ -184,7 +203,11 @@ begin
       if cnt >= 150 then
         acc := acc || E'\non conflict do nothing;';
         insert into _nf_dump(line) values (acc);
-        acc := 'insert into public.' || quote_ident(t.table_name) || ' (' || cols || ') values';
+        acc := 'insert into public.' || quote_ident(t.table_name) || ' (' || cols || ')' ||
+               case when exists (select 1 from information_schema.columns cx
+                                 where cx.table_schema = 'public' and cx.table_name = t.table_name
+                                   and cx.is_identity = 'YES' and cx.identity_generation = 'ALWAYS')
+                    then ' overriding system value' else '' end || ' values';
         cnt := 0;
       end if;
     end loop;
@@ -196,6 +219,17 @@ begin
     if total = 0 then
       insert into _nf_dump(line) values ('-- (این جدول فعلاً خالیه)');
     end if;
+
+    -- تنظیم سکوئنس identity روی ادامه‌ی آخرین آی‌دی (سکوئنش موقع create table خودکار ساخته شده)
+    for c in
+      select column_name from information_schema.columns
+      where table_schema = 'public' and table_name = t.table_name and is_identity = 'YES'
+    loop
+      execute format('select coalesce(max(%I), 0) + 1 from public.%I', c.column_name, t.table_name) into lastv;
+      insert into _nf_dump(line) values
+        ('select setval(pg_get_serial_sequence(' || quote_literal(format('public.%I', t.table_name)) ||
+         ', ' || quote_literal(c.column_name) || '), ' || lastv || ', false);');
+    end loop;
   end loop;
 
   -- ───────── فوتر + لیست اکانت‌ها (فقط به‌صورت کامنت) ─────────
@@ -208,10 +242,14 @@ begin
     ('-- SQL ریپو می‌سازن (qa_fixes تا netforge_v7 — به ترتیب اجراشون کن).'),
     ('-- ── اکانت‌های لاگین (Supabase Auth) — فقط جهت دونستن:');
 
-  for r in select id, email, created_at from auth.users order by created_at loop
-    insert into _nf_dump(line) values
-      ('--   account: ' || r.id || ' | ' || coalesce(r.email, '(no email)') || ' | ' || r.created_at);
-  end loop;
+  if to_regclass('auth.users') is not null then
+    for r in select id, email, created_at from auth.users order by created_at loop
+      insert into _nf_dump(line) values
+        ('--   account: ' || r.id || ' | ' || coalesce(r.email, '(no email)') || ' | ' || r.created_at);
+    end loop;
+  else
+    insert into _nf_dump(line) values ('--   (به جدول auth.users دسترسی نیست — فقط داخل Supabase)');
+  end if;
 
   insert into _nf_dump(line) values ('-- ════════════════════════════════════════════════════════════════════');
 end $gen$;
